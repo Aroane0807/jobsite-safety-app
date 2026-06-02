@@ -37,6 +37,9 @@ export default function Home() {
   const [newTopicSpanish, setNewTopicSpanish] = useState("");
   const [newTopicDocumentName, setNewTopicDocumentName] = useState("");
   const [newTopicDocumentUrl, setNewTopicDocumentUrl] = useState("");
+  const [newTopicFile, setNewTopicFile] = useState(null);
+  const [fileInputKey, setFileInputKey] = useState(Date.now());
+  const [uploadingDocument, setUploadingDocument] = useState(false);
 
   const [assignmentProjectId, setAssignmentProjectId] = useState("");
   const [assignmentTopicId, setAssignmentTopicId] = useState("");
@@ -747,13 +750,51 @@ export default function Home() {
       return;
     }
 
+    setUploadingDocument(true);
+
+    let finalDocumentName = newTopicDocumentName.trim() || null;
+    let finalDocumentUrl = newTopicDocumentUrl.trim() || null;
+
+    if (newTopicFile) {
+      const safeFileName = newTopicFile.name
+        .replace(/[^a-zA-Z0-9._-]/g, "-")
+        .toLowerCase();
+
+      const filePath = `${Date.now()}-${safeFileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("safety-documents")
+        .upload(filePath, newTopicFile, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (uploadError) {
+        setUploadingDocument(false);
+        alert(uploadError.message);
+        return;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("safety-documents")
+        .getPublicUrl(filePath);
+
+      finalDocumentUrl = publicUrlData.publicUrl;
+
+      if (!finalDocumentName) {
+        finalDocumentName = newTopicFile.name;
+      }
+    }
+
     const { error } = await supabase.from("safety_topics").insert({
       title: newTopicTitle.trim(),
       english_content: newTopicEnglish.trim(),
       spanish_content: newTopicSpanish.trim(),
-      document_name: newTopicDocumentName.trim() || null,
-      document_url: newTopicDocumentUrl.trim() || null,
+      document_name: finalDocumentName,
+      document_url: finalDocumentUrl,
     });
+
+    setUploadingDocument(false);
 
     if (error) {
       alert(error.message);
@@ -765,6 +806,9 @@ export default function Home() {
     setNewTopicSpanish("");
     setNewTopicDocumentName("");
     setNewTopicDocumentUrl("");
+    setNewTopicFile(null);
+    setFileInputKey(Date.now());
+
     await refreshAdminLists();
     alert("Safety topic created.");
   }
@@ -1391,16 +1435,42 @@ export default function Home() {
                 />
 
                 <input
+                  key={fileInputKey}
                   style={styles.input}
-                  placeholder="Document URL, example: https://example.com/ladder-safety.pdf"
+                  type="file"
+                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                  onChange={(event) =>
+                    setNewTopicFile(event.target.files?.[0] || null)
+                  }
+                />
+
+                {newTopicFile && (
+                  <p>
+                    Selected file: <strong>{newTopicFile.name}</strong>
+                  </p>
+                )}
+
+                <input
+                  style={styles.input}
+                  placeholder="Optional document URL if not uploading a file"
                   value={newTopicDocumentUrl}
                   onChange={(event) =>
                     setNewTopicDocumentUrl(event.target.value)
                   }
                 />
 
-                <button onClick={createSafetyTopic} style={styles.primaryButton}>
-                  Create Safety Topic
+                <button
+                  onClick={createSafetyTopic}
+                  style={
+                    uploadingDocument
+                      ? styles.disabledButton
+                      : styles.primaryButton
+                  }
+                  disabled={uploadingDocument}
+                >
+                  {uploadingDocument
+                    ? "Uploading..."
+                    : "Create Safety Topic"}
                 </button>
               </div>
 
