@@ -323,6 +323,12 @@ export default function Home() {
       gap: 16,
       alignItems: "start",
     },
+    inlineGrid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+      gap: 12,
+      alignItems: "end",
+    },
   };
 
   const topicText =
@@ -1674,61 +1680,6 @@ export default function Home() {
               </div>
 
               <div style={styles.card}>
-                <h3>Create Worker</h3>
-                <input
-                  style={styles.input}
-                  placeholder="Full name"
-                  value={newWorkerName}
-                  onChange={(event) => setNewWorkerName(event.target.value)}
-                />
-
-                <input
-                  style={styles.input}
-                  placeholder="Email"
-                  value={newWorkerEmail}
-                  onChange={(event) => setNewWorkerEmail(event.target.value)}
-                />
-
-                <input
-                  style={styles.input}
-                  placeholder="Phone"
-                  value={newWorkerPhone}
-                  onChange={(event) => setNewWorkerPhone(event.target.value)}
-                />
-
-                <label>
-                  Preferred language
-                  <select
-                    style={styles.select}
-                    value={newWorkerLanguage}
-                    onChange={(event) =>
-                      setNewWorkerLanguage(event.target.value)
-                    }
-                  >
-                    <option value="english">English</option>
-                    <option value="spanish">Spanish</option>
-                  </select>
-                </label>
-
-                <label>
-                  Role
-                  <select
-                    style={styles.select}
-                    value={newWorkerRole}
-                    onChange={(event) => setNewWorkerRole(event.target.value)}
-                  >
-                    <option value="worker">Worker</option>
-                    <option value="superintendent">Superintendent</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </label>
-
-                <button onClick={createWorker} style={styles.primaryButton}>
-                  Create Worker
-                </button>
-              </div>
-
-              <div style={styles.card}>
                 <h3>Create Safety Topic</h3>
                 <input
                   style={styles.input}
@@ -1901,10 +1852,98 @@ export default function Home() {
             <div style={styles.card}>
               <h3>Manage Workers</h3>
               <p>
-                Edit worker names, phone numbers, preferred language, and role.
-                Worker emails are shown here but should be changed carefully in
-                Supabase Authentication if login email needs to change.
+                Add new workers and edit existing worker names, phone numbers,
+                preferred language, and role. Existing worker emails are shown
+                but should be changed carefully in Supabase Authentication if a
+                login email needs to change.
               </p>
+
+              <div style={styles.card}>
+                <h4 style={{ marginTop: 0 }}>Add New Worker</h4>
+
+                <div style={styles.inlineGrid}>
+                  <div>
+                    <label>
+                      Full Name
+                      <input
+                        style={styles.input}
+                        placeholder="Full name"
+                        value={newWorkerName}
+                        onChange={(event) =>
+                          setNewWorkerName(event.target.value)
+                        }
+                      />
+                    </label>
+                  </div>
+
+                  <div>
+                    <label>
+                      Email
+                      <input
+                        style={styles.input}
+                        placeholder="Email"
+                        value={newWorkerEmail}
+                        onChange={(event) =>
+                          setNewWorkerEmail(event.target.value)
+                        }
+                      />
+                    </label>
+                  </div>
+
+                  <div>
+                    <label>
+                      Phone
+                      <input
+                        style={styles.input}
+                        placeholder="Phone"
+                        value={newWorkerPhone}
+                        onChange={(event) =>
+                          setNewWorkerPhone(event.target.value)
+                        }
+                      />
+                    </label>
+                  </div>
+
+                  <div>
+                    <label>
+                      Language
+                      <select
+                        style={styles.select}
+                        value={newWorkerLanguage}
+                        onChange={(event) =>
+                          setNewWorkerLanguage(event.target.value)
+                        }
+                      >
+                        <option value="english">English</option>
+                        <option value="spanish">Spanish</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div>
+                    <label>
+                      Role
+                      <select
+                        style={styles.select}
+                        value={newWorkerRole}
+                        onChange={(event) =>
+                          setNewWorkerRole(event.target.value)
+                        }
+                      >
+                        <option value="worker">Worker</option>
+                        <option value="superintendent">Superintendent</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
+                <button onClick={createWorker} style={styles.primaryButton}>
+                  Create Worker
+                </button>
+              </div>
+
+              <h4>Existing Workers</h4>
 
               {allWorkers.length > 0 ? (
                 <div style={styles.tableWrap}>
