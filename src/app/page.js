@@ -964,7 +964,48 @@ export default function Home() {
       setAcknowledgements(updatedAckData || []);
     }
   }
+  function updateProjectField(projectId, fieldName, value) {
+    setProjects((currentProjects) =>
+      currentProjects.map((projectItem) =>
+        projectItem.id === projectId
+          ? { ...projectItem, [fieldName]: value }
+          : projectItem
+      )
+    );
+  }
 
+  async function updateProject(projectItem) {
+    if (!isAdmin) {
+      alert("You do not have access to update projects.");
+      return;
+    }
+
+    if (!projectItem.project_name?.trim()) {
+      alert("Project name cannot be blank.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("projects")
+      .update({
+        project_name: projectItem.project_name.trim(),
+        active: Boolean(projectItem.active),
+      })
+      .eq("id", projectItem.id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadProjects();
+
+    if (selectedProjectId === projectItem.id) {
+      await loadProject(projectItem.id);
+    }
+
+    alert("Project updated.");
+  }
   async function createProject() {
     if (!isAdmin) {
       alert("You do not have access to create projects.");
@@ -1666,17 +1707,91 @@ export default function Home() {
             </p>
 
             <div style={styles.formGrid}>
-              <div style={styles.card}>
-                <h3>Create Project</h3>
-                <input
-                  style={styles.input}
-                  placeholder="Project name"
-                  value={newProjectName}
-                  onChange={(event) => setNewProjectName(event.target.value)}
-                />
-                <button onClick={createProject} style={styles.primaryButton}>
-                  Create Project
-                </button>
+                           <div style={styles.card}>
+                <h3>Manage Projects</h3>
+                <p>
+                  Add new projects, rename existing projects, and mark projects
+                  active or inactive.
+                </p>
+
+                <div style={styles.card}>
+                  <h4 style={{ marginTop: 0 }}>Add New Project</h4>
+
+                  <input
+                    style={styles.input}
+                    placeholder="Project name"
+                    value={newProjectName}
+                    onChange={(event) => setNewProjectName(event.target.value)}
+                  />
+
+                  <button onClick={createProject} style={styles.primaryButton}>
+                    Create Project
+                  </button>
+                </div>
+
+                <h4>Existing Projects</h4>
+
+                {projects.length > 0 ? (
+                  <div style={styles.tableWrap}>
+                    <table style={styles.table}>
+                      <thead>
+                        <tr>
+                          <th style={styles.th}>Project Name</th>
+                          <th style={styles.th}>Active</th>
+                          <th style={styles.th}>Action</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {projects.map((projectItem) => (
+                          <tr key={projectItem.id}>
+                            <td style={styles.td}>
+                              <input
+                                style={styles.smallInput}
+                                value={projectItem.project_name || ""}
+                                onChange={(event) =>
+                                  updateProjectField(
+                                    projectItem.id,
+                                    "project_name",
+                                    event.target.value
+                                  )
+                                }
+                              />
+                            </td>
+
+                            <td style={styles.td}>
+                              <select
+                                style={styles.smallSelect}
+                                value={projectItem.active ? "true" : "false"}
+                                onChange={(event) =>
+                                  updateProjectField(
+                                    projectItem.id,
+                                    "active",
+                                    event.target.value === "true"
+                                  )
+                                }
+                              >
+                                <option value="true">Active</option>
+                                <option value="false">Inactive</option>
+                              </select>
+                            </td>
+
+                            <td style={styles.td}>
+                              <button
+                                onClick={() => updateProject(projectItem)}
+                                style={styles.saveButton}
+                              >
+                                Save
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p style={styles.warning}>No projects found.</p>
+                )}
               </div>
 
               <div style={styles.card}>
