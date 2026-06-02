@@ -1,0 +1,1445 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabase";
+
+export default function Home() {
+  const [user, setUser] = useState(null);
+  const [worker, setWorker] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [allWorkers, setAllWorkers] = useState([]);
+  const [allTopics, setAllTopics] = useState([]);
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [topic, setTopic] = useState(null);
+  const [project, setProject] = useState(null);
+  const [assignment, setAssignment] = useState(null);
+  const [acknowledgements, setAcknowledgements] = useState([]);
+  const [workers, setWorkers] = useState([]);
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [checked, setChecked] = useState(false);
+  const [message, setMessage] = useState("");
+  const [alreadyAcknowledged, setAlreadyAcknowledged] = useState(false);
+  const [view, setView] = useState("worker");
+  const [language, setLanguage] = useState("english");
+
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newWorkerName, setNewWorkerName] = useState("");
+  const [newWorkerEmail, setNewWorkerEmail] = useState("");
+  const [newWorkerPhone, setNewWorkerPhone] = useState("");
+  const [newWorkerLanguage, setNewWorkerLanguage] = useState("english");
+  const [newWorkerRole, setNewWorkerRole] = useState("worker");
+
+  const [newTopicTitle, setNewTopicTitle] = useState("");
+  const [newTopicEnglish, setNewTopicEnglish] = useState("");
+  const [newTopicSpanish, setNewTopicSpanish] = useState("");
+
+  const [assignmentProjectId, setAssignmentProjectId] = useState("");
+  const [assignmentTopicId, setAssignmentTopicId] = useState("");
+  const [assignmentDate, setAssignmentDate] = useState("");
+
+  const [linkWorkerId, setLinkWorkerId] = useState("");
+  const [linkProjectId, setLinkProjectId] = useState("");
+
+  const isAdmin =
+    worker?.role === "admin" || worker?.role === "superintendent";
+
+  const styles = {
+    page: {
+      minHeight: "100vh",
+      background: "#f4f6f8",
+      padding: 16,
+      fontFamily: "Arial, sans-serif",
+      color: "#1f2937",
+    },
+    container: {
+      maxWidth: 1000,
+      margin: "0 auto",
+    },
+    card: {
+      background: "#ffffff",
+      border: "1px solid #d1d5db",
+      borderRadius: 12,
+      padding: 20,
+      marginTop: 16,
+      boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
+    },
+    header: {
+      background: "#111827",
+      color: "#ffffff",
+      borderRadius: 12,
+      padding: 20,
+      marginBottom: 16,
+    },
+    title: {
+      margin: 0,
+      fontSize: 28,
+    },
+    subtitle: {
+      marginTop: 8,
+      marginBottom: 0,
+      color: "#d1d5db",
+    },
+    button: {
+      padding: "12px 18px",
+      borderRadius: 8,
+      border: "1px solid #9ca3af",
+      background: "#ffffff",
+      cursor: "pointer",
+      fontSize: 16,
+    },
+    primaryButton: {
+      padding: "14px 20px",
+      borderRadius: 8,
+      border: "none",
+      background: "#2563eb",
+      color: "#ffffff",
+      cursor: "pointer",
+      fontSize: 16,
+      fontWeight: "bold",
+      marginTop: 20,
+      width: "100%",
+      maxWidth: 360,
+    },
+    disabledButton: {
+      padding: "14px 20px",
+      borderRadius: 8,
+      border: "none",
+      background: "#9ca3af",
+      color: "#ffffff",
+      cursor: "not-allowed",
+      fontSize: 16,
+      fontWeight: "bold",
+      marginTop: 20,
+      width: "100%",
+      maxWidth: 360,
+    },
+    tabButton: {
+      padding: "12px 18px",
+      borderRadius: 8,
+      border: "1px solid #9ca3af",
+      cursor: "pointer",
+      fontSize: 16,
+    },
+    input: {
+      display: "block",
+      marginBottom: 12,
+      padding: 12,
+      width: "100%",
+      borderRadius: 8,
+      border: "1px solid #9ca3af",
+      fontSize: 16,
+      boxSizing: "border-box",
+    },
+    textarea: {
+      display: "block",
+      marginBottom: 12,
+      padding: 12,
+      width: "100%",
+      minHeight: 120,
+      borderRadius: 8,
+      border: "1px solid #9ca3af",
+      fontSize: 16,
+      boxSizing: "border-box",
+      fontFamily: "Arial, sans-serif",
+    },
+    select: {
+      padding: 12,
+      width: "100%",
+      borderRadius: 8,
+      border: "1px solid #9ca3af",
+      fontSize: 16,
+      marginTop: 8,
+      marginBottom: 12,
+      boxSizing: "border-box",
+      background: "#ffffff",
+    },
+    topicText: {
+      whiteSpace: "pre-line",
+      lineHeight: 1.6,
+      fontSize: 17,
+    },
+    notice: {
+      background: "#ecfdf5",
+      border: "1px solid #10b981",
+      color: "#065f46",
+      padding: 12,
+      borderRadius: 8,
+      marginTop: 16,
+    },
+    warning: {
+      background: "#fff7ed",
+      border: "1px solid #f97316",
+      color: "#9a3412",
+      padding: 12,
+      borderRadius: 8,
+      marginTop: 16,
+    },
+    statsGrid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+      gap: 12,
+      marginTop: 16,
+    },
+    statBox: {
+      background: "#f9fafb",
+      border: "1px solid #e5e7eb",
+      borderRadius: 10,
+      padding: 14,
+    },
+    statNumber: {
+      fontSize: 28,
+      fontWeight: "bold",
+      margin: 0,
+    },
+    statLabel: {
+      margin: 0,
+      color: "#4b5563",
+    },
+    tableWrap: {
+      overflowX: "auto",
+      marginTop: 16,
+    },
+    table: {
+      width: "100%",
+      borderCollapse: "collapse",
+      background: "#ffffff",
+    },
+    th: {
+      textAlign: "left",
+      borderBottom: "2px solid #d1d5db",
+      padding: 10,
+      whiteSpace: "nowrap",
+    },
+    td: {
+      borderBottom: "1px solid #e5e7eb",
+      padding: 10,
+      whiteSpace: "nowrap",
+    },
+    signedBadge: {
+      display: "inline-block",
+      padding: "4px 10px",
+      borderRadius: 999,
+      background: "#dcfce7",
+      color: "#166534",
+      fontWeight: "bold",
+    },
+    pendingBadge: {
+      display: "inline-block",
+      padding: "4px 10px",
+      borderRadius: 999,
+      background: "#fee2e2",
+      color: "#991b1b",
+      fontWeight: "bold",
+    },
+    roleBadge: {
+      display: "inline-block",
+      padding: "4px 10px",
+      borderRadius: 999,
+      background: "#dbeafe",
+      color: "#1e40af",
+      fontWeight: "bold",
+      marginLeft: 8,
+    },
+    languageRow: {
+      display: "flex",
+      gap: 10,
+      flexWrap: "wrap",
+      marginTop: 16,
+      marginBottom: 16,
+    },
+    languageButton: {
+      padding: "10px 16px",
+      borderRadius: 8,
+      border: "1px solid #9ca3af",
+      cursor: "pointer",
+      fontSize: 15,
+    },
+    formGrid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+      gap: 16,
+      alignItems: "start",
+    },
+  };
+
+  const topicText =
+    language === "spanish"
+      ? topic?.spanish_content || "No hay contenido en español disponible."
+      : topic?.english_content || "No English content available.";
+
+  const acknowledgmentText =
+    language === "spanish"
+      ? "Al marcar esta casilla, confirmo que he leído, entiendo y aplicaré los procedimientos de seguridad descritos en esta charla diaria de seguridad mientras trabajo en el sitio de trabajo."
+      : "By checking this box, I confirm that I have read, understand, and will implement the safety procedures outlined in this daily safety briefing while working on the jobsite.";
+
+  const acknowledgeButtonText =
+    language === "spanish"
+      ? alreadyAcknowledged
+        ? "Ya Reconocido"
+        : "Reconocer Tema de Seguridad"
+      : alreadyAcknowledged
+      ? "Already Acknowledged"
+      : "Acknowledge Safety Topic";
+
+  const alreadyAcknowledgedMessage =
+    language === "spanish"
+      ? "Ya ha reconocido este tema de seguridad."
+      : "You have already acknowledged this safety topic.";
+
+  const successMessage =
+    language === "spanish"
+      ? "Tema de seguridad reconocido correctamente."
+      : "Safety topic acknowledged successfully.";
+
+  async function login() {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      alert(error.message);
+    } else {
+      setUser(data.user);
+    }
+  }
+
+  async function logout() {
+    await supabase.auth.signOut();
+
+    setUser(null);
+    setWorker(null);
+    setProjects([]);
+    setAllWorkers([]);
+    setAllTopics([]);
+    setSelectedProjectId("");
+    setTopic(null);
+    setProject(null);
+    setAssignment(null);
+    setAcknowledgements([]);
+    setWorkers([]);
+    setChecked(false);
+    setMessage("");
+    setAlreadyAcknowledged(false);
+    setView("worker");
+    setLanguage("english");
+  }
+
+  async function loadWorker(currentUser) {
+    if (!currentUser?.email) return null;
+
+    const { data, error } = await supabase
+      .from("workers")
+      .select("*")
+      .eq("email", currentUser.email)
+      .maybeSingle();
+
+    if (error) {
+      console.log(error);
+      return null;
+    }
+
+    if (!data) {
+      setMessage(
+        "No worker profile found for this email. Add this email to the workers table in Supabase."
+      );
+      return null;
+    }
+
+    setWorker(data);
+
+    if (data.role !== "admin" && data.role !== "superintendent") {
+      setView("worker");
+    }
+
+    if (data.preferred_language === "spanish") {
+      setLanguage("spanish");
+    } else {
+      setLanguage("english");
+    }
+
+    return data;
+  }
+
+  async function loadProjects() {
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("active", true)
+      .order("project_name", { ascending: true });
+
+    if (error) {
+      console.log(error);
+      setProjects([]);
+      return [];
+    }
+
+    setProjects(data || []);
+    return data || [];
+  }
+
+  async function loadAllWorkers() {
+    const { data, error } = await supabase
+      .from("workers")
+      .select("*")
+      .order("full_name", { ascending: true });
+
+    if (error) {
+      console.log(error);
+      setAllWorkers([]);
+      return [];
+    }
+
+    setAllWorkers(data || []);
+    return data || [];
+  }
+
+  async function loadAllTopics() {
+    const { data, error } = await supabase
+      .from("safety_topics")
+      .select("*")
+      .order("title", { ascending: true });
+
+    if (error) {
+      console.log(error);
+      setAllTopics([]);
+      return [];
+    }
+
+    setAllTopics(data || []);
+    return data || [];
+  }
+
+  async function refreshAdminLists() {
+    const projectList = await loadProjects();
+    await loadAllWorkers();
+    await loadAllTopics();
+
+    if (!selectedProjectId && projectList.length > 0) {
+      setSelectedProjectId(projectList[0].id);
+    }
+  }
+
+  async function loadProject(projectId) {
+    if (!projectId) {
+      setProject(null);
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("id", projectId)
+      .maybeSingle();
+
+    if (error) {
+      console.log(error);
+      setProject(null);
+      return null;
+    }
+
+    setProject(data);
+    return data;
+  }
+
+  async function loadProjectWorkers(projectId) {
+    if (!projectId) {
+      setWorkers([]);
+      return [];
+    }
+
+    const { data: projectWorkerData, error: projectWorkerError } =
+      await supabase
+        .from("worker_projects")
+        .select("worker_id")
+        .eq("project_id", projectId);
+
+    if (projectWorkerError) {
+      console.log(projectWorkerError);
+      setWorkers([]);
+      return [];
+    }
+
+    const workerIds = (projectWorkerData || []).map((row) => row.worker_id);
+
+    if (workerIds.length === 0) {
+      setWorkers([]);
+      return [];
+    }
+
+    const { data: workerData, error: workerError } = await supabase
+      .from("workers")
+      .select("*")
+      .in("id", workerIds)
+      .order("full_name", { ascending: true });
+
+    if (workerError) {
+      console.log(workerError);
+      setWorkers([]);
+      return [];
+    }
+
+    setWorkers(workerData || []);
+    return workerData || [];
+  }
+
+  async function loadLatestAssignmentForProject(projectId, currentWorker) {
+    if (!projectId) {
+      setAssignment(null);
+      setTopic(null);
+      setAcknowledgements([]);
+      setWorkers([]);
+      setAlreadyAcknowledged(false);
+      setChecked(false);
+      setMessage("");
+      return;
+    }
+
+    setChecked(false);
+    setAlreadyAcknowledged(false);
+    setMessage("");
+
+    await loadProject(projectId);
+    await loadProjectWorkers(projectId);
+
+    const { data, error } = await supabase
+      .from("daily_assignments")
+      .select("id, assigned_date, project_id, safety_topics(*)")
+      .eq("project_id", projectId)
+      .order("assigned_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.log(error);
+      setAssignment(null);
+      setTopic(null);
+      setAcknowledgements([]);
+      return;
+    }
+
+    if (!data) {
+      setAssignment(null);
+      setTopic(null);
+      setAcknowledgements([]);
+      setMessage("No safety topic has been assigned to this project yet.");
+      return;
+    }
+
+    setAssignment(data);
+    setTopic(data.safety_topics);
+
+    const { data: ackData, error: ackError } = await supabase
+      .from("acknowledgements")
+      .select("*")
+      .eq("assignment_id", data.id)
+      .order("acknowledged_at", { ascending: false });
+
+    if (ackError) {
+      console.log(ackError);
+      setAcknowledgements([]);
+    } else {
+      setAcknowledgements(ackData || []);
+    }
+
+    if (currentWorker) {
+      const { data: existingAck } = await supabase
+        .from("acknowledgements")
+        .select("*")
+        .eq("assignment_id", data.id)
+        .eq("worker_id", currentWorker.id)
+        .maybeSingle();
+
+      if (existingAck) {
+        setAlreadyAcknowledged(true);
+        setMessage(alreadyAcknowledgedMessage);
+      } else {
+        setAlreadyAcknowledged(false);
+        setMessage("");
+      }
+    }
+  }
+
+  async function workerIsAssignedToProject(currentWorker, projectId) {
+    if (!currentWorker || !projectId) return false;
+
+    const { data, error } = await supabase
+      .from("worker_projects")
+      .select("*")
+      .eq("worker_id", currentWorker.id)
+      .eq("project_id", projectId)
+      .maybeSingle();
+
+    if (error) {
+      console.log(error);
+      return false;
+    }
+
+    return Boolean(data);
+  }
+
+  async function acknowledge() {
+    if (!checked) {
+      alert(
+        language === "spanish"
+          ? "Marque la casilla de reconocimiento antes de enviar."
+          : "Please check the acknowledgment box before submitting."
+      );
+      return;
+    }
+
+    if (!assignment) {
+      alert(
+        language === "spanish"
+          ? "No se encontró una asignación diaria."
+          : "No daily assignment found."
+      );
+      return;
+    }
+
+    if (!worker) {
+      alert(
+        language === "spanish"
+          ? "No se encontró un perfil de trabajador para este inicio de sesión."
+          : "No worker profile found for this login. Make sure this email exists in the workers table."
+      );
+      return;
+    }
+
+    const isAssigned = await workerIsAssignedToProject(
+      worker,
+      selectedProjectId
+    );
+
+    if (!isAssigned) {
+      alert(
+        language === "spanish"
+          ? "Este trabajador no está asignado a este proyecto."
+          : "This worker is not assigned to this project. Add this worker to the project in the worker_projects table."
+      );
+      return;
+    }
+
+    const { data: existingAck } = await supabase
+      .from("acknowledgements")
+      .select("*")
+      .eq("assignment_id", assignment.id)
+      .eq("worker_id", worker.id)
+      .maybeSingle();
+
+    if (existingAck) {
+      setAlreadyAcknowledged(true);
+      setMessage(alreadyAcknowledgedMessage);
+      return;
+    }
+
+    const { error } = await supabase.from("acknowledgements").insert({
+      assignment_id: assignment.id,
+      worker_id: worker.id,
+    });
+
+    if (error) {
+      alert(error.message);
+    } else {
+      setAlreadyAcknowledged(true);
+      setMessage(successMessage);
+
+      const { data: updatedAckData } = await supabase
+        .from("acknowledgements")
+        .select("*")
+        .eq("assignment_id", assignment.id)
+        .order("acknowledged_at", { ascending: false });
+
+      setAcknowledgements(updatedAckData || []);
+    }
+  }
+
+  async function createProject() {
+    if (!isAdmin) {
+      alert("You do not have access to create projects.");
+      return;
+    }
+
+    if (!newProjectName.trim()) {
+      alert("Enter a project name.");
+      return;
+    }
+
+    const { error } = await supabase.from("projects").insert({
+      project_name: newProjectName.trim(),
+      active: true,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setNewProjectName("");
+    await refreshAdminLists();
+    alert("Project created.");
+  }
+
+  async function createWorker() {
+    if (!isAdmin) {
+      alert("You do not have access to create workers.");
+      return;
+    }
+
+    if (!newWorkerName.trim()) {
+      alert("Enter worker name.");
+      return;
+    }
+
+    if (!newWorkerEmail.trim()) {
+      alert("Enter worker email.");
+      return;
+    }
+
+    const { error } = await supabase.from("workers").insert({
+      full_name: newWorkerName.trim(),
+      email: newWorkerEmail.trim(),
+      phone: newWorkerPhone.trim() || null,
+      preferred_language: newWorkerLanguage,
+      role: newWorkerRole,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setNewWorkerName("");
+    setNewWorkerEmail("");
+    setNewWorkerPhone("");
+    setNewWorkerLanguage("english");
+    setNewWorkerRole("worker");
+    await refreshAdminLists();
+    alert("Worker created.");
+  }
+
+  async function createSafetyTopic() {
+    if (!isAdmin) {
+      alert("You do not have access to create safety topics.");
+      return;
+    }
+
+    if (!newTopicTitle.trim()) {
+      alert("Enter a safety topic title.");
+      return;
+    }
+
+    const { error } = await supabase.from("safety_topics").insert({
+      title: newTopicTitle.trim(),
+      english_content: newTopicEnglish.trim(),
+      spanish_content: newTopicSpanish.trim(),
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setNewTopicTitle("");
+    setNewTopicEnglish("");
+    setNewTopicSpanish("");
+    await refreshAdminLists();
+    alert("Safety topic created.");
+  }
+
+  async function createAssignment() {
+    if (!isAdmin) {
+      alert("You do not have access to create assignments.");
+      return;
+    }
+
+    if (!assignmentProjectId) {
+      alert("Choose a project.");
+      return;
+    }
+
+    if (!assignmentTopicId) {
+      alert("Choose a safety topic.");
+      return;
+    }
+
+    if (!assignmentDate) {
+      alert("Choose an assignment date.");
+      return;
+    }
+
+    const { error } = await supabase.from("daily_assignments").insert({
+      project_id: assignmentProjectId,
+      topic_id: assignmentTopicId,
+      assigned_date: assignmentDate,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setAssignmentProjectId("");
+    setAssignmentTopicId("");
+    setAssignmentDate("");
+
+    if (assignmentProjectId === selectedProjectId) {
+      await loadLatestAssignmentForProject(selectedProjectId, worker);
+    }
+
+    alert("Safety topic assigned to project.");
+  }
+
+  async function linkWorkerToProject() {
+    if (!isAdmin) {
+      alert("You do not have access to link workers to projects.");
+      return;
+    }
+
+    if (!linkWorkerId) {
+      alert("Choose a worker.");
+      return;
+    }
+
+    if (!linkProjectId) {
+      alert("Choose a project.");
+      return;
+    }
+
+    const { data: existingLink } = await supabase
+      .from("worker_projects")
+      .select("*")
+      .eq("worker_id", linkWorkerId)
+      .eq("project_id", linkProjectId)
+      .maybeSingle();
+
+    if (existingLink) {
+      alert("This worker is already assigned to that project.");
+      return;
+    }
+
+    const { error } = await supabase.from("worker_projects").insert({
+      worker_id: linkWorkerId,
+      project_id: linkProjectId,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setLinkWorkerId("");
+    setLinkProjectId("");
+
+    if (linkProjectId === selectedProjectId) {
+      await loadLatestAssignmentForProject(selectedProjectId, worker);
+    }
+
+    alert("Worker linked to project.");
+  }
+
+  function handleProjectChange(event) {
+    const newProjectId = event.target.value;
+    setSelectedProjectId(newProjectId);
+    loadLatestAssignmentForProject(newProjectId, worker);
+  }
+
+  function handleViewChange(nextView) {
+    if ((nextView === "dashboard" || nextView === "admin") && !isAdmin) {
+      setView("worker");
+      alert("You do not have access to that section.");
+      return;
+    }
+
+    setView(nextView);
+  }
+
+  function getAcknowledgementForWorker(workerId) {
+    return acknowledgements.find((ack) => ack.worker_id === workerId);
+  }
+
+  function formatDateTime(value) {
+    if (!value) return "—";
+
+    return new Date(value).toLocaleString();
+  }
+
+  const signedCount = workers.filter((workerItem) =>
+    acknowledgements.some((ack) => ack.worker_id === workerItem.id)
+  ).length;
+
+  const totalWorkerCount = workers.length;
+  const pendingCount = totalWorkerCount - signedCount;
+
+  useEffect(() => {
+    async function checkUser() {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user);
+    }
+
+    checkUser();
+  }, []);
+
+  useEffect(() => {
+    async function loadInitialData() {
+      const currentWorker = await loadWorker(user);
+      const projectList = await loadProjects();
+      await loadAllWorkers();
+      await loadAllTopics();
+
+      if (projectList.length > 0) {
+        const firstProjectId = projectList[0].id;
+        setSelectedProjectId(firstProjectId);
+        await loadLatestAssignmentForProject(firstProjectId, currentWorker);
+      }
+    }
+
+    if (user) {
+      loadInitialData();
+    }
+  }, [user]);
+
+  if (!user) {
+    return (
+      <main style={styles.page}>
+        <div style={{ ...styles.container, maxWidth: 420 }}>
+          <div style={styles.header}>
+            <h1 style={styles.title}>Jobsite Safety</h1>
+            <p style={styles.subtitle}>Daily safety acknowledgment portal</p>
+          </div>
+
+          <div style={styles.card}>
+            <h2>Login</h2>
+
+            <input
+              style={styles.input}
+              placeholder="Email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+
+            <input
+              style={styles.input}
+              placeholder="Password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+
+            <button onClick={login} style={styles.primaryButton}>
+              Login
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main style={styles.page}>
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <h1 style={styles.title}>Jobsite Safety</h1>
+          <p style={styles.subtitle}>
+            Logged in as {user.email}
+            {worker ? ` • ${worker.full_name}` : ""}
+            {worker?.role ? (
+              <span style={styles.roleBadge}>{worker.role}</span>
+            ) : null}
+          </p>
+        </div>
+
+        <div style={styles.card}>
+          <button onClick={logout} style={styles.button}>
+            Logout
+          </button>
+
+          <div style={{ marginTop: 20 }}>
+            <label>
+              <strong>Select Project</strong>
+              <select
+                value={selectedProjectId}
+                onChange={handleProjectChange}
+                style={styles.select}
+              >
+                {projects.length > 0 ? (
+                  projects.map((projectItem) => (
+                    <option key={projectItem.id} value={projectItem.id}>
+                      {projectItem.project_name}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">No projects found</option>
+                )}
+              </select>
+            </label>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              marginTop: 20,
+              flexWrap: "wrap",
+            }}
+          >
+            <button
+              onClick={() => handleViewChange("worker")}
+              style={{
+                ...styles.tabButton,
+                background: view === "worker" ? "#2563eb" : "#ffffff",
+                color: view === "worker" ? "#ffffff" : "#1f2937",
+                fontWeight: view === "worker" ? "bold" : "normal",
+              }}
+            >
+              Worker View
+            </button>
+
+            {isAdmin && (
+              <button
+                onClick={() => handleViewChange("dashboard")}
+                style={{
+                  ...styles.tabButton,
+                  background: view === "dashboard" ? "#2563eb" : "#ffffff",
+                  color: view === "dashboard" ? "#ffffff" : "#1f2937",
+                  fontWeight: view === "dashboard" ? "bold" : "normal",
+                }}
+              >
+                Superintendent Dashboard
+              </button>
+            )}
+
+            {isAdmin && (
+              <button
+                onClick={() => handleViewChange("admin")}
+                style={{
+                  ...styles.tabButton,
+                  background: view === "admin" ? "#2563eb" : "#ffffff",
+                  color: view === "admin" ? "#ffffff" : "#1f2937",
+                  fontWeight: view === "admin" ? "bold" : "normal",
+                }}
+              >
+                Admin Tools
+              </button>
+            )}
+          </div>
+        </div>
+
+        {view === "worker" && (
+          <div style={styles.card}>
+            <h2>Today's Safety Topic</h2>
+
+            {project && (
+              <p>
+                <strong>Project:</strong> {project.project_name}
+              </p>
+            )}
+
+            <div style={styles.languageRow}>
+              <button
+                onClick={() => setLanguage("english")}
+                style={{
+                  ...styles.languageButton,
+                  background: language === "english" ? "#2563eb" : "#ffffff",
+                  color: language === "english" ? "#ffffff" : "#1f2937",
+                  fontWeight: language === "english" ? "bold" : "normal",
+                }}
+              >
+                English
+              </button>
+
+              <button
+                onClick={() => setLanguage("spanish")}
+                style={{
+                  ...styles.languageButton,
+                  background: language === "spanish" ? "#2563eb" : "#ffffff",
+                  color: language === "spanish" ? "#ffffff" : "#1f2937",
+                  fontWeight: language === "spanish" ? "bold" : "normal",
+                }}
+              >
+                Español
+              </button>
+            </div>
+
+            {topic ? (
+              <>
+                <h3>{topic.title}</h3>
+
+                <p style={styles.topicText}>{topicText}</p>
+
+                <div
+                  style={{
+                    marginTop: 24,
+                    padding: 16,
+                    border: "1px solid #d1d5db",
+                    borderRadius: 10,
+                    background: "#f9fafb",
+                  }}
+                >
+                  <label style={{ display: "flex", gap: 10, lineHeight: 1.5 }}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={alreadyAcknowledged}
+                      onChange={(event) => setChecked(event.target.checked)}
+                      style={{ marginTop: 4 }}
+                    />
+                    <span>{acknowledgmentText}</span>
+                  </label>
+                </div>
+
+                <button
+                  onClick={acknowledge}
+                  disabled={alreadyAcknowledged}
+                  style={
+                    alreadyAcknowledged
+                      ? styles.disabledButton
+                      : styles.primaryButton
+                  }
+                >
+                  {acknowledgeButtonText}
+                </button>
+
+                {message && (
+                  <p
+                    style={
+                      alreadyAcknowledged || message.includes("successfully")
+                        ? styles.notice
+                        : styles.warning
+                    }
+                  >
+                    {message}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p style={styles.warning}>
+                {message || "No safety topic assigned."}
+              </p>
+            )}
+          </div>
+        )}
+
+        {view === "dashboard" && isAdmin && (
+          <div style={styles.card}>
+            <h2>Superintendent Dashboard</h2>
+
+            {assignment && topic ? (
+              <>
+                <div style={styles.card}>
+                  <h3 style={{ marginTop: 0 }}>Current Assignment</h3>
+
+                  {project && (
+                    <p>
+                      <strong>Project:</strong> {project.project_name}
+                    </p>
+                  )}
+
+                  <p>
+                    <strong>Topic:</strong> {topic.title}
+                  </p>
+
+                  <p>
+                    <strong>Assigned Date:</strong> {assignment.assigned_date}
+                  </p>
+
+                  <div style={styles.statsGrid}>
+                    <div style={styles.statBox}>
+                      <p style={styles.statNumber}>{totalWorkerCount}</p>
+                      <p style={styles.statLabel}>Project Workers</p>
+                    </div>
+
+                    <div style={styles.statBox}>
+                      <p style={styles.statNumber}>{signedCount}</p>
+                      <p style={styles.statLabel}>Signed</p>
+                    </div>
+
+                    <div style={styles.statBox}>
+                      <p style={styles.statNumber}>{pendingCount}</p>
+                      <p style={styles.statLabel}>Pending</p>
+                    </div>
+                  </div>
+                </div>
+
+                <h3>Project Worker Sign-Off Status</h3>
+
+                {workers.length > 0 ? (
+                  <div style={styles.tableWrap}>
+                    <table style={styles.table}>
+                      <thead>
+                        <tr>
+                          <th style={styles.th}>Worker</th>
+                          <th style={styles.th}>Email</th>
+                          <th style={styles.th}>Status</th>
+                          <th style={styles.th}>Time Acknowledged</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {workers.map((workerItem) => {
+                          const workerAck = getAcknowledgementForWorker(
+                            workerItem.id
+                          );
+
+                          const isSigned = Boolean(workerAck);
+
+                          return (
+                            <tr key={workerItem.id}>
+                              <td style={styles.td}>
+                                {workerItem.full_name}
+                              </td>
+
+                              <td style={styles.td}>
+                                {workerItem.email || "No email"}
+                              </td>
+
+                              <td style={styles.td}>
+                                <span
+                                  style={
+                                    isSigned
+                                      ? styles.signedBadge
+                                      : styles.pendingBadge
+                                  }
+                                >
+                                  {isSigned ? "Signed" : "Pending"}
+                                </span>
+                              </td>
+
+                              <td style={styles.td}>
+                                {formatDateTime(
+                                  workerAck?.acknowledged_at ||
+                                    workerAck?.Acknowledged_at
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p style={styles.warning}>
+                    No workers are assigned to this project yet. Add workers to
+                    this project in the worker_projects table.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p style={styles.warning}>
+                {message || "No assignment found for this project."}
+              </p>
+            )}
+          </div>
+        )}
+
+        {view === "admin" && isAdmin && (
+          <div style={styles.card}>
+            <h2>Admin Tools</h2>
+            <p>
+              Use these tools to create projects, workers, safety topics, daily
+              assignments, and project worker links without opening Supabase.
+            </p>
+
+            <div style={styles.formGrid}>
+              <div style={styles.card}>
+                <h3>Create Project</h3>
+                <input
+                  style={styles.input}
+                  placeholder="Project name"
+                  value={newProjectName}
+                  onChange={(event) => setNewProjectName(event.target.value)}
+                />
+                <button onClick={createProject} style={styles.primaryButton}>
+                  Create Project
+                </button>
+              </div>
+
+              <div style={styles.card}>
+                <h3>Create Worker</h3>
+                <input
+                  style={styles.input}
+                  placeholder="Full name"
+                  value={newWorkerName}
+                  onChange={(event) => setNewWorkerName(event.target.value)}
+                />
+
+                <input
+                  style={styles.input}
+                  placeholder="Email"
+                  value={newWorkerEmail}
+                  onChange={(event) => setNewWorkerEmail(event.target.value)}
+                />
+
+                <input
+                  style={styles.input}
+                  placeholder="Phone"
+                  value={newWorkerPhone}
+                  onChange={(event) => setNewWorkerPhone(event.target.value)}
+                />
+
+                <label>
+                  Preferred language
+                  <select
+                    style={styles.select}
+                    value={newWorkerLanguage}
+                    onChange={(event) =>
+                      setNewWorkerLanguage(event.target.value)
+                    }
+                  >
+                    <option value="english">English</option>
+                    <option value="spanish">Spanish</option>
+                  </select>
+                </label>
+
+                <label>
+                  Role
+                  <select
+                    style={styles.select}
+                    value={newWorkerRole}
+                    onChange={(event) => setNewWorkerRole(event.target.value)}
+                  >
+                    <option value="worker">Worker</option>
+                    <option value="superintendent">Superintendent</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </label>
+
+                <button onClick={createWorker} style={styles.primaryButton}>
+                  Create Worker
+                </button>
+              </div>
+
+              <div style={styles.card}>
+                <h3>Create Safety Topic</h3>
+                <input
+                  style={styles.input}
+                  placeholder="Topic title"
+                  value={newTopicTitle}
+                  onChange={(event) => setNewTopicTitle(event.target.value)}
+                />
+
+                <textarea
+                  style={styles.textarea}
+                  placeholder="English content"
+                  value={newTopicEnglish}
+                  onChange={(event) => setNewTopicEnglish(event.target.value)}
+                />
+
+                <textarea
+                  style={styles.textarea}
+                  placeholder="Spanish content"
+                  value={newTopicSpanish}
+                  onChange={(event) => setNewTopicSpanish(event.target.value)}
+                />
+
+                <button onClick={createSafetyTopic} style={styles.primaryButton}>
+                  Create Safety Topic
+                </button>
+              </div>
+
+              <div style={styles.card}>
+                <h3>Assign Topic to Project</h3>
+
+                <label>
+                  Project
+                  <select
+                    style={styles.select}
+                    value={assignmentProjectId}
+                    onChange={(event) =>
+                      setAssignmentProjectId(event.target.value)
+                    }
+                  >
+                    <option value="">Select project</option>
+                    {projects.map((projectItem) => (
+                      <option key={projectItem.id} value={projectItem.id}>
+                        {projectItem.project_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Safety Topic
+                  <select
+                    style={styles.select}
+                    value={assignmentTopicId}
+                    onChange={(event) =>
+                      setAssignmentTopicId(event.target.value)
+                    }
+                  >
+                    <option value="">Select topic</option>
+                    {allTopics.map((topicItem) => (
+                      <option key={topicItem.id} value={topicItem.id}>
+                        {topicItem.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Date
+                  <input
+                    style={styles.input}
+                    type="date"
+                    value={assignmentDate}
+                    onChange={(event) => setAssignmentDate(event.target.value)}
+                  />
+                </label>
+
+                <button onClick={createAssignment} style={styles.primaryButton}>
+                  Assign Topic
+                </button>
+              </div>
+
+              <div style={styles.card}>
+                <h3>Link Worker to Project</h3>
+
+                <label>
+                  Worker
+                  <select
+                    style={styles.select}
+                    value={linkWorkerId}
+                    onChange={(event) => setLinkWorkerId(event.target.value)}
+                  >
+                    <option value="">Select worker</option>
+                    {allWorkers.map((workerItem) => (
+                      <option key={workerItem.id} value={workerItem.id}>
+                        {workerItem.full_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Project
+                  <select
+                    style={styles.select}
+                    value={linkProjectId}
+                    onChange={(event) => setLinkProjectId(event.target.value)}
+                  >
+                    <option value="">Select project</option>
+                    {projects.map((projectItem) => (
+                      <option key={projectItem.id} value={projectItem.id}>
+                        {projectItem.project_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <button
+                  onClick={linkWorkerToProject}
+                  style={styles.primaryButton}
+                >
+                  Link Worker
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
