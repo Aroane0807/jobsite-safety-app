@@ -1124,7 +1124,51 @@ export default function Home() {
       )
     );
   }
+  function updateTopicField(topicId, fieldName, value) {
+    setAllTopics((currentTopics) =>
+      currentTopics.map((topicItem) =>
+        topicItem.id === topicId
+          ? { ...topicItem, [fieldName]: value }
+          : topicItem
+      )
+    );
+  }
 
+  async function updateSafetyTopic(topicItem) {
+    if (!isAdmin) {
+      alert("You do not have access to update safety topics.");
+      return;
+    }
+
+    if (!topicItem.title?.trim()) {
+      alert("Safety topic title cannot be blank.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("safety_topics")
+      .update({
+        title: topicItem.title.trim(),
+        english_content: topicItem.english_content || "",
+        spanish_content: topicItem.spanish_content || "",
+        document_name: topicItem.document_name?.trim() || null,
+        document_url: topicItem.document_url?.trim() || null,
+      })
+      .eq("id", topicItem.id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadAllTopics();
+
+    if (assignment?.safety_topics?.id === topicItem.id || topic?.id === topicItem.id) {
+      await loadLatestAssignmentForProject(selectedProjectId, worker);
+    }
+
+    alert("Safety topic updated.");
+  }
   async function createSafetyTopic() {
     if (!isAdmin) {
       alert("You do not have access to create safety topics.");
@@ -1794,76 +1838,193 @@ export default function Home() {
                 )}
               </div>
 
-              <div style={styles.card}>
-                <h3>Create Safety Topic</h3>
-                <input
-                  style={styles.input}
-                  placeholder="Topic title"
-                  value={newTopicTitle}
-                  onChange={(event) => setNewTopicTitle(event.target.value)}
-                />
+                            <div style={styles.card}>
+                <h3>Manage Safety Topics</h3>
+                <p>
+                  Add new safety topics, upload documents, and edit existing
+                  safety topic details.
+                </p>
 
-                <textarea
-                  style={styles.textarea}
-                  placeholder="English content"
-                  value={newTopicEnglish}
-                  onChange={(event) => setNewTopicEnglish(event.target.value)}
-                />
+                <div style={styles.card}>
+                  <h4 style={{ marginTop: 0 }}>Add New Safety Topic</h4>
 
-                <textarea
-                  style={styles.textarea}
-                  placeholder="Spanish content"
-                  value={newTopicSpanish}
-                  onChange={(event) => setNewTopicSpanish(event.target.value)}
-                />
+                  <input
+                    style={styles.input}
+                    placeholder="Topic title"
+                    value={newTopicTitle}
+                    onChange={(event) => setNewTopicTitle(event.target.value)}
+                  />
 
-                <input
-                  style={styles.input}
-                  placeholder="Document name, example: Ladder Safety PDF"
-                  value={newTopicDocumentName}
-                  onChange={(event) =>
-                    setNewTopicDocumentName(event.target.value)
-                  }
-                />
+                  <textarea
+                    style={styles.textarea}
+                    placeholder="English content"
+                    value={newTopicEnglish}
+                    onChange={(event) => setNewTopicEnglish(event.target.value)}
+                  />
 
-                <input
-                  key={fileInputKey}
-                  style={styles.input}
-                  type="file"
-                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                  onChange={(event) =>
-                    setNewTopicFile(event.target.files?.[0] || null)
-                  }
-                />
+                  <textarea
+                    style={styles.textarea}
+                    placeholder="Spanish content"
+                    value={newTopicSpanish}
+                    onChange={(event) => setNewTopicSpanish(event.target.value)}
+                  />
 
-                {newTopicFile && (
-                  <p>
-                    Selected file: <strong>{newTopicFile.name}</strong>
-                  </p>
+                  <input
+                    style={styles.input}
+                    placeholder="Document name, example: Ladder Safety PDF"
+                    value={newTopicDocumentName}
+                    onChange={(event) =>
+                      setNewTopicDocumentName(event.target.value)
+                    }
+                  />
+
+                  <input
+                    key={fileInputKey}
+                    style={styles.input}
+                    type="file"
+                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                    onChange={(event) =>
+                      setNewTopicFile(event.target.files?.[0] || null)
+                    }
+                  />
+
+                  {newTopicFile && (
+                    <p>
+                      Selected file: <strong>{newTopicFile.name}</strong>
+                    </p>
+                  )}
+
+                  <input
+                    style={styles.input}
+                    placeholder="Optional document URL if not uploading a file"
+                    value={newTopicDocumentUrl}
+                    onChange={(event) =>
+                      setNewTopicDocumentUrl(event.target.value)
+                    }
+                  />
+
+                  <button
+                    onClick={createSafetyTopic}
+                    style={
+                      uploadingDocument
+                        ? styles.disabledButton
+                        : styles.primaryButton
+                    }
+                    disabled={uploadingDocument}
+                  >
+                    {uploadingDocument
+                      ? "Uploading..."
+                      : "Create Safety Topic"}
+                  </button>
+                </div>
+
+                <h4>Existing Safety Topics</h4>
+
+                {allTopics.length > 0 ? (
+                  <div>
+                    {allTopics.map((topicItem) => (
+                      <div key={topicItem.id} style={styles.card}>
+                        <label>
+                          Topic Title
+                          <input
+                            style={styles.input}
+                            value={topicItem.title || ""}
+                            onChange={(event) =>
+                              updateTopicField(
+                                topicItem.id,
+                                "title",
+                                event.target.value
+                              )
+                            }
+                          />
+                        </label>
+
+                        <label>
+                          English Content
+                          <textarea
+                            style={styles.textarea}
+                            value={topicItem.english_content || ""}
+                            onChange={(event) =>
+                              updateTopicField(
+                                topicItem.id,
+                                "english_content",
+                                event.target.value
+                              )
+                            }
+                          />
+                        </label>
+
+                        <label>
+                          Spanish Content
+                          <textarea
+                            style={styles.textarea}
+                            value={topicItem.spanish_content || ""}
+                            onChange={(event) =>
+                              updateTopicField(
+                                topicItem.id,
+                                "spanish_content",
+                                event.target.value
+                              )
+                            }
+                          />
+                        </label>
+
+                        <label>
+                          Document Name
+                          <input
+                            style={styles.input}
+                            value={topicItem.document_name || ""}
+                            placeholder="Document name"
+                            onChange={(event) =>
+                              updateTopicField(
+                                topicItem.id,
+                                "document_name",
+                                event.target.value
+                              )
+                            }
+                          />
+                        </label>
+
+                        <label>
+                          Document URL
+                          <input
+                            style={styles.input}
+                            value={topicItem.document_url || ""}
+                            placeholder="Document URL"
+                            onChange={(event) =>
+                              updateTopicField(
+                                topicItem.id,
+                                "document_url",
+                                event.target.value
+                              )
+                            }
+                          />
+                        </label>
+
+                        {topicItem.document_url && (
+                          <p>
+                            <a
+                              href={topicItem.document_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              Open current document
+                            </a>
+                          </p>
+                        )}
+
+                        <button
+                          onClick={() => updateSafetyTopic(topicItem)}
+                          style={styles.saveButton}
+                        >
+                          Save Safety Topic
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={styles.warning}>No safety topics found.</p>
                 )}
-
-                <input
-                  style={styles.input}
-                  placeholder="Optional document URL if not uploading a file"
-                  value={newTopicDocumentUrl}
-                  onChange={(event) =>
-                    setNewTopicDocumentUrl(event.target.value)
-                  }
-                />
-
-                <button
-                  onClick={createSafetyTopic}
-                  style={
-                    uploadingDocument
-                      ? styles.disabledButton
-                      : styles.primaryButton
-                  }
-                  disabled={uploadingDocument}
-                >
-                  {uploadingDocument
-                    ? "Uploading..."
-                    : "Create Safety Topic"}
-                </button>
               </div>
 
               <div style={styles.card}>
