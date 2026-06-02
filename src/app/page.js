@@ -35,6 +35,8 @@ export default function Home() {
   const [newTopicTitle, setNewTopicTitle] = useState("");
   const [newTopicEnglish, setNewTopicEnglish] = useState("");
   const [newTopicSpanish, setNewTopicSpanish] = useState("");
+  const [newTopicDocumentName, setNewTopicDocumentName] = useState("");
+  const [newTopicDocumentUrl, setNewTopicDocumentUrl] = useState("");
 
   const [assignmentProjectId, setAssignmentProjectId] = useState("");
   const [assignmentTopicId, setAssignmentTopicId] = useState("");
@@ -102,6 +104,19 @@ export default function Home() {
       marginTop: 20,
       width: "100%",
       maxWidth: 360,
+    },
+    documentButton: {
+      display: "inline-block",
+      padding: "14px 20px",
+      borderRadius: 8,
+      border: "none",
+      background: "#059669",
+      color: "#ffffff",
+      cursor: "pointer",
+      fontSize: 16,
+      fontWeight: "bold",
+      marginTop: 16,
+      textDecoration: "none",
     },
     disabledButton: {
       padding: "14px 20px",
@@ -736,6 +751,8 @@ export default function Home() {
       title: newTopicTitle.trim(),
       english_content: newTopicEnglish.trim(),
       spanish_content: newTopicSpanish.trim(),
+      document_name: newTopicDocumentName.trim() || null,
+      document_url: newTopicDocumentUrl.trim() || null,
     });
 
     if (error) {
@@ -746,6 +763,8 @@ export default function Home() {
     setNewTopicTitle("");
     setNewTopicEnglish("");
     setNewTopicSpanish("");
+    setNewTopicDocumentName("");
+    setNewTopicDocumentUrl("");
     await refreshAdminLists();
     alert("Safety topic created.");
   }
@@ -1070,6 +1089,20 @@ export default function Home() {
 
                 <p style={styles.topicText}>{topicText}</p>
 
+                {topic.document_url && (
+                  <div style={{ marginTop: 16 }}>
+                    <a
+                      href={topic.document_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={styles.documentButton}
+                    >
+                      Open Safety Document
+                      {topic.document_name ? `: ${topic.document_name}` : ""}
+                    </a>
+                  </div>
+                )}
+
                 <div
                   style={{
                     marginTop: 24,
@@ -1145,6 +1178,19 @@ export default function Home() {
                   <p>
                     <strong>Assigned Date:</strong> {assignment.assigned_date}
                   </p>
+
+                  {topic.document_url && (
+                    <p>
+                      <strong>Document:</strong>{" "}
+                      <a
+                        href={topic.document_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {topic.document_name || topic.document_url}
+                      </a>
+                    </p>
+                  )}
 
                   <div style={styles.statsGrid}>
                     <div style={styles.statBox}>
@@ -1333,6 +1379,24 @@ export default function Home() {
                   placeholder="Spanish content"
                   value={newTopicSpanish}
                   onChange={(event) => setNewTopicSpanish(event.target.value)}
+                />
+
+                <input
+                  style={styles.input}
+                  placeholder="Document name, example: Ladder Safety PDF"
+                  value={newTopicDocumentName}
+                  onChange={(event) =>
+                    setNewTopicDocumentName(event.target.value)
+                  }
+                />
+
+                <input
+                  style={styles.input}
+                  placeholder="Document URL, example: https://example.com/ladder-safety.pdf"
+                  value={newTopicDocumentUrl}
+                  onChange={(event) =>
+                    setNewTopicDocumentUrl(event.target.value)
+                  }
                 />
 
                 <button onClick={createSafetyTopic} style={styles.primaryButton}>
