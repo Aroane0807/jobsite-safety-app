@@ -6,9 +6,12 @@ import { supabase } from "../lib/supabase";
 export default function Home() {
   const [user, setUser] = useState(null);
   const [worker, setWorker] = useState(null);
+
   const [projects, setProjects] = useState([]);
+  const [allProjects, setAllProjects] = useState([]);
   const [allWorkers, setAllWorkers] = useState([]);
   const [allTopics, setAllTopics] = useState([]);
+
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [topic, setTopic] = useState(null);
   const [project, setProject] = useState(null);
@@ -25,7 +28,13 @@ export default function Home() {
   const [view, setView] = useState("worker");
   const [language, setLanguage] = useState("english");
 
+  const [adminTab, setAdminTab] = useState("projects");
+  const [topicSearch, setTopicSearch] = useState("");
+  const [selectedTopicId, setSelectedTopicId] = useState("");
+  const [showAddTopicForm, setShowAddTopicForm] = useState(false);
+
   const [newProjectName, setNewProjectName] = useState("");
+
   const [newWorkerName, setNewWorkerName] = useState("");
   const [newWorkerEmail, setNewWorkerEmail] = useState("");
   const [newWorkerPhone, setNewWorkerPhone] = useState("");
@@ -50,6 +59,20 @@ export default function Home() {
 
   const isAdmin =
     worker?.role === "admin" || worker?.role === "superintendent";
+
+  const selectedTopicForEdit = allTopics.find(
+    (topicItem) => topicItem.id === selectedTopicId
+  );
+
+  const filteredTopics = allTopics.filter((topicItem) => {
+    const search = topicSearch.toLowerCase();
+
+    return (
+      topicItem.title?.toLowerCase().includes(search) ||
+      topicItem.english_content?.toLowerCase().includes(search) ||
+      topicItem.spanish_content?.toLowerCase().includes(search)
+    );
+  });
 
   const styles = {
     page: {
@@ -164,6 +187,13 @@ export default function Home() {
       border: "1px solid #9ca3af",
       cursor: "pointer",
       fontSize: 16,
+    },
+    adminTabButton: {
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #9ca3af",
+      cursor: "pointer",
+      fontSize: 15,
     },
     input: {
       display: "block",
@@ -328,6 +358,22 @@ export default function Home() {
       gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
       gap: 12,
       alignItems: "end",
+    },
+    compactList: {
+      display: "grid",
+      gap: 10,
+      marginTop: 16,
+    },
+    compactListItem: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 12,
+      border: "1px solid #e5e7eb",
+      borderRadius: 10,
+      padding: 12,
+      background: "#f9fafb",
+      flexWrap: "wrap",
     },
   };
 
@@ -621,6 +667,7 @@ export default function Home() {
     setUser(null);
     setWorker(null);
     setProjects([]);
+    setAllProjects([]);
     setAllWorkers([]);
     setAllTopics([]);
     setSelectedProjectId("");
@@ -634,6 +681,7 @@ export default function Home() {
     setAlreadyAcknowledged(false);
     setView("worker");
     setLanguage("english");
+    setAdminTab("projects");
   }
 
   async function loadWorker(currentUser) {
@@ -689,6 +737,22 @@ export default function Home() {
     return data || [];
   }
 
+  async function loadAllProjects() {
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .order("project_name", { ascending: true });
+
+    if (error) {
+      console.log(error);
+      setAllProjects([]);
+      return [];
+    }
+
+    setAllProjects(data || []);
+    return data || [];
+  }
+
   async function loadAllWorkers() {
     const { data, error } = await supabase
       .from("workers")
@@ -723,6 +787,7 @@ export default function Home() {
 
   async function refreshAdminLists() {
     const projectList = await loadProjects();
+    await loadAllProjects();
     await loadAllWorkers();
     await loadAllTopics();
 
@@ -964,8 +1029,35 @@ export default function Home() {
       setAcknowledgements(updatedAckData || []);
     }
   }
+
+  async function createProject() {
+    if (!isAdmin) {
+      alert("You do not have access to create projects.");
+      return;
+    }
+
+    if (!newProjectName.trim()) {
+      alert("Enter a project name.");
+      return;
+    }
+
+    const { error } = await supabase.from("projects").insert({
+      project_name: newProjectName.trim(),
+      active: true,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setNewProjectName("");
+    await refreshAdminLists();
+    alert("Project created.");
+  }
+
   function updateProjectField(projectId, fieldName, value) {
-    setProjects((currentProjects) =>
+    setAllProjects((currentProjects) =>
       currentProjects.map((projectItem) =>
         projectItem.id === projectId
           ? { ...projectItem, [fieldName]: value }
@@ -999,37 +1091,13 @@ export default function Home() {
     }
 
     await loadProjects();
+    await loadAllProjects();
 
     if (selectedProjectId === projectItem.id) {
       await loadProject(projectItem.id);
     }
 
     alert("Project updated.");
-  }
-  async function createProject() {
-    if (!isAdmin) {
-      alert("You do not have access to create projects.");
-      return;
-    }
-
-    if (!newProjectName.trim()) {
-      alert("Enter a project name.");
-      return;
-    }
-
-    const { error } = await supabase.from("projects").insert({
-      project_name: newProjectName.trim(),
-      active: true,
-    });
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setNewProjectName("");
-    await refreshAdminLists();
-    alert("Project created.");
   }
 
   async function createWorker() {
@@ -1124,51 +1192,7 @@ export default function Home() {
       )
     );
   }
-  function updateTopicField(topicId, fieldName, value) {
-    setAllTopics((currentTopics) =>
-      currentTopics.map((topicItem) =>
-        topicItem.id === topicId
-          ? { ...topicItem, [fieldName]: value }
-          : topicItem
-      )
-    );
-  }
 
-  async function updateSafetyTopic(topicItem) {
-    if (!isAdmin) {
-      alert("You do not have access to update safety topics.");
-      return;
-    }
-
-    if (!topicItem.title?.trim()) {
-      alert("Safety topic title cannot be blank.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("safety_topics")
-      .update({
-        title: topicItem.title.trim(),
-        english_content: topicItem.english_content || "",
-        spanish_content: topicItem.spanish_content || "",
-        document_name: topicItem.document_name?.trim() || null,
-        document_url: topicItem.document_url?.trim() || null,
-      })
-      .eq("id", topicItem.id);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    await loadAllTopics();
-
-    if (assignment?.safety_topics?.id === topicItem.id || topic?.id === topicItem.id) {
-      await loadLatestAssignmentForProject(selectedProjectId, worker);
-    }
-
-    alert("Safety topic updated.");
-  }
   async function createSafetyTopic() {
     if (!isAdmin) {
       alert("You do not have access to create safety topics.");
@@ -1238,9 +1262,56 @@ export default function Home() {
     setNewTopicDocumentUrl("");
     setNewTopicFile(null);
     setFileInputKey(Date.now());
+    setShowAddTopicForm(false);
 
     await refreshAdminLists();
     alert("Safety topic created.");
+  }
+
+  function updateTopicField(topicId, fieldName, value) {
+    setAllTopics((currentTopics) =>
+      currentTopics.map((topicItem) =>
+        topicItem.id === topicId
+          ? { ...topicItem, [fieldName]: value }
+          : topicItem
+      )
+    );
+  }
+
+  async function updateSafetyTopic(topicItem) {
+    if (!isAdmin) {
+      alert("You do not have access to update safety topics.");
+      return;
+    }
+
+    if (!topicItem.title?.trim()) {
+      alert("Safety topic title cannot be blank.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("safety_topics")
+      .update({
+        title: topicItem.title.trim(),
+        english_content: topicItem.english_content || "",
+        spanish_content: topicItem.spanish_content || "",
+        document_name: topicItem.document_name?.trim() || null,
+        document_url: topicItem.document_url?.trim() || null,
+      })
+      .eq("id", topicItem.id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadAllTopics();
+
+    if (topic?.id === topicItem.id) {
+      await loadLatestAssignmentForProject(selectedProjectId, worker);
+    }
+
+    alert("Safety topic updated.");
   }
 
   async function createAssignment() {
@@ -1363,6 +1434,7 @@ export default function Home() {
     async function loadInitialData() {
       const currentWorker = await loadWorker(user);
       const projectList = await loadProjects();
+      await loadAllProjects();
       await loadAllWorkers();
       await loadAllTopics();
 
@@ -1448,7 +1520,7 @@ export default function Home() {
                     </option>
                   ))
                 ) : (
-                  <option value="">No projects found</option>
+                  <option value="">No active projects found</option>
                 )}
               </select>
             </label>
@@ -1666,7 +1738,10 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <button onClick={generatePdfReport} style={styles.reportButton}>
+                  <button
+                    onClick={generatePdfReport}
+                    style={styles.reportButton}
+                  >
                     Generate PDF Report
                   </button>
                 </div>
@@ -1730,7 +1805,7 @@ export default function Home() {
                 ) : (
                   <p style={styles.warning}>
                     No workers are assigned to this project yet. Add workers to
-                    this project in the worker_projects table.
+                    this project under Admin Tools.
                   </p>
                 )}
               </>
@@ -1746,12 +1821,42 @@ export default function Home() {
           <div style={styles.card}>
             <h2>Admin Tools</h2>
             <p>
-              Use these tools to create projects, workers, safety topics, daily
-              assignments, and project worker links without opening Supabase.
+              Use these organized sections to manage projects, workers, safety
+              topics, and assignments.
             </p>
 
-            <div style={styles.formGrid}>
-                           <div style={styles.card}>
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                flexWrap: "wrap",
+                marginTop: 16,
+              }}
+            >
+              {["projects", "workers", "topics", "assignments"].map(
+                (tabName) => (
+                  <button
+                    key={tabName}
+                    onClick={() => setAdminTab(tabName)}
+                    style={{
+                      ...styles.adminTabButton,
+                      background:
+                        adminTab === tabName ? "#2563eb" : "#ffffff",
+                      color: adminTab === tabName ? "#ffffff" : "#1f2937",
+                      fontWeight: adminTab === tabName ? "bold" : "normal",
+                    }}
+                  >
+                    {tabName === "projects" && "Projects"}
+                    {tabName === "workers" && "Workers"}
+                    {tabName === "topics" && "Safety Topics"}
+                    {tabName === "assignments" && "Assignments"}
+                  </button>
+                )
+              )}
+            </div>
+
+            {adminTab === "projects" && (
+              <div style={styles.card}>
                 <h3>Manage Projects</h3>
                 <p>
                   Add new projects, rename existing projects, and mark projects
@@ -1775,7 +1880,7 @@ export default function Home() {
 
                 <h4>Existing Projects</h4>
 
-                {projects.length > 0 ? (
+                {allProjects.length > 0 ? (
                   <div style={styles.tableWrap}>
                     <table style={styles.table}>
                       <thead>
@@ -1787,7 +1892,7 @@ export default function Home() {
                       </thead>
 
                       <tbody>
-                        {projects.map((projectItem) => (
+                        {allProjects.map((projectItem) => (
                           <tr key={projectItem.id}>
                             <td style={styles.td}>
                               <input
@@ -1837,308 +1942,20 @@ export default function Home() {
                   <p style={styles.warning}>No projects found.</p>
                 )}
               </div>
+            )}
 
-                            <div style={styles.card}>
-                <h3>Manage Safety Topics</h3>
+            {adminTab === "workers" && (
+              <div style={styles.card}>
+                <h3>Manage Workers</h3>
                 <p>
-                  Add new safety topics, upload documents, and edit existing
-                  safety topic details.
+                  Add workers, edit worker details, and link workers to
+                  projects.
                 </p>
 
                 <div style={styles.card}>
-                  <h4 style={{ marginTop: 0 }}>Add New Safety Topic</h4>
+                  <h4 style={{ marginTop: 0 }}>Add New Worker</h4>
 
-                  <input
-                    style={styles.input}
-                    placeholder="Topic title"
-                    value={newTopicTitle}
-                    onChange={(event) => setNewTopicTitle(event.target.value)}
-                  />
-
-                  <textarea
-                    style={styles.textarea}
-                    placeholder="English content"
-                    value={newTopicEnglish}
-                    onChange={(event) => setNewTopicEnglish(event.target.value)}
-                  />
-
-                  <textarea
-                    style={styles.textarea}
-                    placeholder="Spanish content"
-                    value={newTopicSpanish}
-                    onChange={(event) => setNewTopicSpanish(event.target.value)}
-                  />
-
-                  <input
-                    style={styles.input}
-                    placeholder="Document name, example: Ladder Safety PDF"
-                    value={newTopicDocumentName}
-                    onChange={(event) =>
-                      setNewTopicDocumentName(event.target.value)
-                    }
-                  />
-
-                  <input
-                    key={fileInputKey}
-                    style={styles.input}
-                    type="file"
-                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                    onChange={(event) =>
-                      setNewTopicFile(event.target.files?.[0] || null)
-                    }
-                  />
-
-                  {newTopicFile && (
-                    <p>
-                      Selected file: <strong>{newTopicFile.name}</strong>
-                    </p>
-                  )}
-
-                  <input
-                    style={styles.input}
-                    placeholder="Optional document URL if not uploading a file"
-                    value={newTopicDocumentUrl}
-                    onChange={(event) =>
-                      setNewTopicDocumentUrl(event.target.value)
-                    }
-                  />
-
-                  <button
-                    onClick={createSafetyTopic}
-                    style={
-                      uploadingDocument
-                        ? styles.disabledButton
-                        : styles.primaryButton
-                    }
-                    disabled={uploadingDocument}
-                  >
-                    {uploadingDocument
-                      ? "Uploading..."
-                      : "Create Safety Topic"}
-                  </button>
-                </div>
-
-                <h4>Existing Safety Topics</h4>
-
-                {allTopics.length > 0 ? (
-                  <div>
-                    {allTopics.map((topicItem) => (
-                      <div key={topicItem.id} style={styles.card}>
-                        <label>
-                          Topic Title
-                          <input
-                            style={styles.input}
-                            value={topicItem.title || ""}
-                            onChange={(event) =>
-                              updateTopicField(
-                                topicItem.id,
-                                "title",
-                                event.target.value
-                              )
-                            }
-                          />
-                        </label>
-
-                        <label>
-                          English Content
-                          <textarea
-                            style={styles.textarea}
-                            value={topicItem.english_content || ""}
-                            onChange={(event) =>
-                              updateTopicField(
-                                topicItem.id,
-                                "english_content",
-                                event.target.value
-                              )
-                            }
-                          />
-                        </label>
-
-                        <label>
-                          Spanish Content
-                          <textarea
-                            style={styles.textarea}
-                            value={topicItem.spanish_content || ""}
-                            onChange={(event) =>
-                              updateTopicField(
-                                topicItem.id,
-                                "spanish_content",
-                                event.target.value
-                              )
-                            }
-                          />
-                        </label>
-
-                        <label>
-                          Document Name
-                          <input
-                            style={styles.input}
-                            value={topicItem.document_name || ""}
-                            placeholder="Document name"
-                            onChange={(event) =>
-                              updateTopicField(
-                                topicItem.id,
-                                "document_name",
-                                event.target.value
-                              )
-                            }
-                          />
-                        </label>
-
-                        <label>
-                          Document URL
-                          <input
-                            style={styles.input}
-                            value={topicItem.document_url || ""}
-                            placeholder="Document URL"
-                            onChange={(event) =>
-                              updateTopicField(
-                                topicItem.id,
-                                "document_url",
-                                event.target.value
-                              )
-                            }
-                          />
-                        </label>
-
-                        {topicItem.document_url && (
-                          <p>
-                            <a
-                              href={topicItem.document_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              Open current document
-                            </a>
-                          </p>
-                        )}
-
-                        <button
-                          onClick={() => updateSafetyTopic(topicItem)}
-                          style={styles.saveButton}
-                        >
-                          Save Safety Topic
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p style={styles.warning}>No safety topics found.</p>
-                )}
-              </div>
-
-              <div style={styles.card}>
-                <h3>Assign Topic to Project</h3>
-
-                <label>
-                  Project
-                  <select
-                    style={styles.select}
-                    value={assignmentProjectId}
-                    onChange={(event) =>
-                      setAssignmentProjectId(event.target.value)
-                    }
-                  >
-                    <option value="">Select project</option>
-                    {projects.map((projectItem) => (
-                      <option key={projectItem.id} value={projectItem.id}>
-                        {projectItem.project_name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Safety Topic
-                  <select
-                    style={styles.select}
-                    value={assignmentTopicId}
-                    onChange={(event) =>
-                      setAssignmentTopicId(event.target.value)
-                    }
-                  >
-                    <option value="">Select topic</option>
-                    {allTopics.map((topicItem) => (
-                      <option key={topicItem.id} value={topicItem.id}>
-                        {topicItem.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Date
-                  <input
-                    style={styles.input}
-                    type="date"
-                    value={assignmentDate}
-                    onChange={(event) => setAssignmentDate(event.target.value)}
-                  />
-                </label>
-
-                <button onClick={createAssignment} style={styles.primaryButton}>
-                  Assign Topic
-                </button>
-              </div>
-
-              <div style={styles.card}>
-                <h3>Link Worker to Project</h3>
-
-                <label>
-                  Worker
-                  <select
-                    style={styles.select}
-                    value={linkWorkerId}
-                    onChange={(event) => setLinkWorkerId(event.target.value)}
-                  >
-                    <option value="">Select worker</option>
-                    {allWorkers.map((workerItem) => (
-                      <option key={workerItem.id} value={workerItem.id}>
-                        {workerItem.full_name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Project
-                  <select
-                    style={styles.select}
-                    value={linkProjectId}
-                    onChange={(event) => setLinkProjectId(event.target.value)}
-                  >
-                    <option value="">Select project</option>
-                    {projects.map((projectItem) => (
-                      <option key={projectItem.id} value={projectItem.id}>
-                        {projectItem.project_name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <button
-                  onClick={linkWorkerToProject}
-                  style={styles.primaryButton}
-                >
-                  Link Worker
-                </button>
-              </div>
-            </div>
-
-            <div style={styles.card}>
-              <h3>Manage Workers</h3>
-              <p>
-                Add new workers and edit existing worker names, phone numbers,
-                preferred language, and role. Existing worker emails are shown
-                but should be changed carefully in Supabase Authentication if a
-                login email needs to change.
-              </p>
-
-              <div style={styles.card}>
-                <h4 style={{ marginTop: 0 }}>Add New Worker</h4>
-
-                <div style={styles.inlineGrid}>
-                  <div>
+                  <div style={styles.inlineGrid}>
                     <label>
                       Full Name
                       <input
@@ -2150,9 +1967,7 @@ export default function Home() {
                         }
                       />
                     </label>
-                  </div>
 
-                  <div>
                     <label>
                       Email
                       <input
@@ -2164,9 +1979,7 @@ export default function Home() {
                         }
                       />
                     </label>
-                  </div>
 
-                  <div>
                     <label>
                       Phone
                       <input
@@ -2178,9 +1991,7 @@ export default function Home() {
                         }
                       />
                     </label>
-                  </div>
 
-                  <div>
                     <label>
                       Language
                       <select
@@ -2194,9 +2005,7 @@ export default function Home() {
                         <option value="spanish">Spanish</option>
                       </select>
                     </label>
-                  </div>
 
-                  <div>
                     <label>
                       Role
                       <select
@@ -2212,118 +2021,481 @@ export default function Home() {
                       </select>
                     </label>
                   </div>
+
+                  <button onClick={createWorker} style={styles.primaryButton}>
+                    Create Worker
+                  </button>
                 </div>
 
-                <button onClick={createWorker} style={styles.primaryButton}>
-                  Create Worker
-                </button>
-              </div>
+                <div style={styles.card}>
+                  <h4 style={{ marginTop: 0 }}>Link Worker to Project</h4>
 
-              <h4>Existing Workers</h4>
+                  <div style={styles.inlineGrid}>
+                    <label>
+                      Worker
+                      <select
+                        style={styles.select}
+                        value={linkWorkerId}
+                        onChange={(event) => setLinkWorkerId(event.target.value)}
+                      >
+                        <option value="">Select worker</option>
+                        {allWorkers.map((workerItem) => (
+                          <option key={workerItem.id} value={workerItem.id}>
+                            {workerItem.full_name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
 
-              {allWorkers.length > 0 ? (
-                <div style={styles.tableWrap}>
-                  <table style={styles.table}>
-                    <thead>
-                      <tr>
-                        <th style={styles.th}>Name</th>
-                        <th style={styles.th}>Email</th>
-                        <th style={styles.th}>Phone</th>
-                        <th style={styles.th}>Language</th>
-                        <th style={styles.th}>Role</th>
-                        <th style={styles.th}>Action</th>
-                      </tr>
-                    </thead>
+                    <label>
+                      Project
+                      <select
+                        style={styles.select}
+                        value={linkProjectId}
+                        onChange={(event) =>
+                          setLinkProjectId(event.target.value)
+                        }
+                      >
+                        <option value="">Select project</option>
+                        {projects.map((projectItem) => (
+                          <option key={projectItem.id} value={projectItem.id}>
+                            {projectItem.project_name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
 
-                    <tbody>
-                      {allWorkers.map((workerItem) => (
-                        <tr key={workerItem.id}>
-                          <td style={styles.td}>
-                            <input
-                              style={styles.smallInput}
-                              value={workerItem.full_name || ""}
-                              onChange={(event) =>
-                                updateWorkerField(
-                                  workerItem.id,
-                                  "full_name",
-                                  event.target.value
-                                )
-                              }
-                            />
-                          </td>
+                  <button
+                    onClick={linkWorkerToProject}
+                    style={styles.primaryButton}
+                  >
+                    Link Worker
+                  </button>
+                </div>
 
-                          <td style={styles.td}>
-                            {workerItem.email || "No email"}
-                          </td>
+                <h4>Existing Workers</h4>
 
-                          <td style={styles.td}>
-                            <input
-                              style={styles.smallInput}
-                              value={workerItem.phone || ""}
-                              onChange={(event) =>
-                                updateWorkerField(
-                                  workerItem.id,
-                                  "phone",
-                                  event.target.value
-                                )
-                              }
-                            />
-                          </td>
-
-                          <td style={styles.td}>
-                            <select
-                              style={styles.smallSelect}
-                              value={workerItem.preferred_language || "english"}
-                              onChange={(event) =>
-                                updateWorkerField(
-                                  workerItem.id,
-                                  "preferred_language",
-                                  event.target.value
-                                )
-                              }
-                            >
-                              <option value="english">English</option>
-                              <option value="spanish">Spanish</option>
-                            </select>
-                          </td>
-
-                          <td style={styles.td}>
-                            <select
-                              style={styles.smallSelect}
-                              value={workerItem.role || "worker"}
-                              onChange={(event) =>
-                                updateWorkerField(
-                                  workerItem.id,
-                                  "role",
-                                  event.target.value
-                                )
-                              }
-                            >
-                              <option value="worker">Worker</option>
-                              <option value="superintendent">
-                                Superintendent
-                              </option>
-                              <option value="admin">Admin</option>
-                            </select>
-                          </td>
-
-                          <td style={styles.td}>
-                            <button
-                              onClick={() => updateWorker(workerItem)}
-                              style={styles.saveButton}
-                            >
-                              Save
-                            </button>
-                          </td>
+                {allWorkers.length > 0 ? (
+                  <div style={styles.tableWrap}>
+                    <table style={styles.table}>
+                      <thead>
+                        <tr>
+                          <th style={styles.th}>Name</th>
+                          <th style={styles.th}>Email</th>
+                          <th style={styles.th}>Phone</th>
+                          <th style={styles.th}>Language</th>
+                          <th style={styles.th}>Role</th>
+                          <th style={styles.th}>Action</th>
                         </tr>
+                      </thead>
+
+                      <tbody>
+                        {allWorkers.map((workerItem) => (
+                          <tr key={workerItem.id}>
+                            <td style={styles.td}>
+                              <input
+                                style={styles.smallInput}
+                                value={workerItem.full_name || ""}
+                                onChange={(event) =>
+                                  updateWorkerField(
+                                    workerItem.id,
+                                    "full_name",
+                                    event.target.value
+                                  )
+                                }
+                              />
+                            </td>
+
+                            <td style={styles.td}>
+                              {workerItem.email || "No email"}
+                            </td>
+
+                            <td style={styles.td}>
+                              <input
+                                style={styles.smallInput}
+                                value={workerItem.phone || ""}
+                                onChange={(event) =>
+                                  updateWorkerField(
+                                    workerItem.id,
+                                    "phone",
+                                    event.target.value
+                                  )
+                                }
+                              />
+                            </td>
+
+                            <td style={styles.td}>
+                              <select
+                                style={styles.smallSelect}
+                                value={
+                                  workerItem.preferred_language || "english"
+                                }
+                                onChange={(event) =>
+                                  updateWorkerField(
+                                    workerItem.id,
+                                    "preferred_language",
+                                    event.target.value
+                                  )
+                                }
+                              >
+                                <option value="english">English</option>
+                                <option value="spanish">Spanish</option>
+                              </select>
+                            </td>
+
+                            <td style={styles.td}>
+                              <select
+                                style={styles.smallSelect}
+                                value={workerItem.role || "worker"}
+                                onChange={(event) =>
+                                  updateWorkerField(
+                                    workerItem.id,
+                                    "role",
+                                    event.target.value
+                                  )
+                                }
+                              >
+                                <option value="worker">Worker</option>
+                                <option value="superintendent">
+                                  Superintendent
+                                </option>
+                                <option value="admin">Admin</option>
+                              </select>
+                            </td>
+
+                            <td style={styles.td}>
+                              <button
+                                onClick={() => updateWorker(workerItem)}
+                                style={styles.saveButton}
+                              >
+                                Save
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p style={styles.warning}>No workers found.</p>
+                )}
+              </div>
+            )}
+
+            {adminTab === "topics" && (
+              <div style={styles.card}>
+                <h3>Manage Safety Topics</h3>
+                <p>
+                  Add new topics, search existing topics, and edit one topic at
+                  a time.
+                </p>
+
+                <button
+                  onClick={() => setShowAddTopicForm(!showAddTopicForm)}
+                  style={styles.primaryButton}
+                >
+                  {showAddTopicForm ? "Hide Add Topic Form" : "+ Add New Topic"}
+                </button>
+
+                {showAddTopicForm && (
+                  <div style={styles.card}>
+                    <h4 style={{ marginTop: 0 }}>Add New Safety Topic</h4>
+
+                    <input
+                      style={styles.input}
+                      placeholder="Topic title"
+                      value={newTopicTitle}
+                      onChange={(event) =>
+                        setNewTopicTitle(event.target.value)
+                      }
+                    />
+
+                    <textarea
+                      style={styles.textarea}
+                      placeholder="English content"
+                      value={newTopicEnglish}
+                      onChange={(event) =>
+                        setNewTopicEnglish(event.target.value)
+                      }
+                    />
+
+                    <textarea
+                      style={styles.textarea}
+                      placeholder="Spanish content"
+                      value={newTopicSpanish}
+                      onChange={(event) =>
+                        setNewTopicSpanish(event.target.value)
+                      }
+                    />
+
+                    <input
+                      style={styles.input}
+                      placeholder="Document name, example: Ladder Safety PDF"
+                      value={newTopicDocumentName}
+                      onChange={(event) =>
+                        setNewTopicDocumentName(event.target.value)
+                      }
+                    />
+
+                    <input
+                      key={fileInputKey}
+                      style={styles.input}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                      onChange={(event) =>
+                        setNewTopicFile(event.target.files?.[0] || null)
+                      }
+                    />
+
+                    {newTopicFile && (
+                      <p>
+                        Selected file: <strong>{newTopicFile.name}</strong>
+                      </p>
+                    )}
+
+                    <input
+                      style={styles.input}
+                      placeholder="Optional document URL if not uploading a file"
+                      value={newTopicDocumentUrl}
+                      onChange={(event) =>
+                        setNewTopicDocumentUrl(event.target.value)
+                      }
+                    />
+
+                    <button
+                      onClick={createSafetyTopic}
+                      style={
+                        uploadingDocument
+                          ? styles.disabledButton
+                          : styles.primaryButton
+                      }
+                      disabled={uploadingDocument}
+                    >
+                      {uploadingDocument
+                        ? "Uploading..."
+                        : "Create Safety Topic"}
+                    </button>
+                  </div>
+                )}
+
+                <div style={styles.card}>
+                  <h4 style={{ marginTop: 0 }}>Existing Safety Topics</h4>
+
+                  <input
+                    style={styles.input}
+                    placeholder="Search safety topics..."
+                    value={topicSearch}
+                    onChange={(event) => setTopicSearch(event.target.value)}
+                  />
+
+                  {filteredTopics.length > 0 ? (
+                    <div style={styles.compactList}>
+                      {filteredTopics.map((topicItem) => (
+                        <div key={topicItem.id} style={styles.compactListItem}>
+                          <div>
+                            <strong>{topicItem.title}</strong>
+                            {topicItem.document_url && (
+                              <div style={{ fontSize: 13, color: "#4b5563" }}>
+                                Document attached
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={() => setSelectedTopicId(topicItem.id)}
+                            style={styles.saveButton}
+                          >
+                            Edit
+                          </button>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                  ) : (
+                    <p style={styles.warning}>No safety topics found.</p>
+                  )}
                 </div>
-              ) : (
-                <p style={styles.warning}>No workers found.</p>
-              )}
-            </div>
+
+                {selectedTopicForEdit && (
+                  <div style={styles.card}>
+                    <h4 style={{ marginTop: 0 }}>
+                      Edit Topic: {selectedTopicForEdit.title}
+                    </h4>
+
+                    <label>
+                      Topic Title
+                      <input
+                        style={styles.input}
+                        value={selectedTopicForEdit.title || ""}
+                        onChange={(event) =>
+                          updateTopicField(
+                            selectedTopicForEdit.id,
+                            "title",
+                            event.target.value
+                          )
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      English Content
+                      <textarea
+                        style={styles.textarea}
+                        value={selectedTopicForEdit.english_content || ""}
+                        onChange={(event) =>
+                          updateTopicField(
+                            selectedTopicForEdit.id,
+                            "english_content",
+                            event.target.value
+                          )
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Spanish Content
+                      <textarea
+                        style={styles.textarea}
+                        value={selectedTopicForEdit.spanish_content || ""}
+                        onChange={(event) =>
+                          updateTopicField(
+                            selectedTopicForEdit.id,
+                            "spanish_content",
+                            event.target.value
+                          )
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Document Name
+                      <input
+                        style={styles.input}
+                        value={selectedTopicForEdit.document_name || ""}
+                        placeholder="Document name"
+                        onChange={(event) =>
+                          updateTopicField(
+                            selectedTopicForEdit.id,
+                            "document_name",
+                            event.target.value
+                          )
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Document URL
+                      <input
+                        style={styles.input}
+                        value={selectedTopicForEdit.document_url || ""}
+                        placeholder="Document URL"
+                        onChange={(event) =>
+                          updateTopicField(
+                            selectedTopicForEdit.id,
+                            "document_url",
+                            event.target.value
+                          )
+                        }
+                      />
+                    </label>
+
+                    {selectedTopicForEdit.document_url && (
+                      <p>
+                        <a
+                          href={selectedTopicForEdit.document_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Open current document
+                        </a>
+                      </p>
+                    )}
+
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      <button
+                        onClick={() => updateSafetyTopic(selectedTopicForEdit)}
+                        style={styles.saveButton}
+                      >
+                        Save Safety Topic
+                      </button>
+
+                      <button
+                        onClick={() => setSelectedTopicId("")}
+                        style={styles.button}
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {adminTab === "assignments" && (
+              <div style={styles.card}>
+                <h3>Manage Assignments</h3>
+                <p>Assign safety topics to projects for a specific date.</p>
+
+                <div style={styles.card}>
+                  <h4 style={{ marginTop: 0 }}>Assign Topic to Project</h4>
+
+                  <label>
+                    Project
+                    <select
+                      style={styles.select}
+                      value={assignmentProjectId}
+                      onChange={(event) =>
+                        setAssignmentProjectId(event.target.value)
+                      }
+                    >
+                      <option value="">Select project</option>
+                      {projects.map((projectItem) => (
+                        <option key={projectItem.id} value={projectItem.id}>
+                          {projectItem.project_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Safety Topic
+                    <select
+                      style={styles.select}
+                      value={assignmentTopicId}
+                      onChange={(event) =>
+                        setAssignmentTopicId(event.target.value)
+                      }
+                    >
+                      <option value="">Select topic</option>
+                      {allTopics.map((topicItem) => (
+                        <option key={topicItem.id} value={topicItem.id}>
+                          {topicItem.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Date
+                    <input
+                      style={styles.input}
+                      type="date"
+                      value={assignmentDate}
+                      onChange={(event) =>
+                        setAssignmentDate(event.target.value)
+                      }
+                    />
+                  </label>
+
+                  <button
+                    onClick={createAssignment}
+                    style={styles.primaryButton}
+                  >
+                    Assign Topic
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
