@@ -60,7 +60,7 @@ export default function Home() {
       color: "#1f2937",
     },
     container: {
-      maxWidth: 1000,
+      maxWidth: 1100,
       margin: "0 auto",
     },
     card: {
@@ -107,6 +107,16 @@ export default function Home() {
       marginTop: 20,
       width: "100%",
       maxWidth: 360,
+    },
+    saveButton: {
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "none",
+      background: "#059669",
+      color: "#ffffff",
+      cursor: "pointer",
+      fontSize: 14,
+      fontWeight: "bold",
     },
     reportButton: {
       padding: "14px 20px",
@@ -165,6 +175,14 @@ export default function Home() {
       fontSize: 16,
       boxSizing: "border-box",
     },
+    smallInput: {
+      padding: 8,
+      width: "100%",
+      borderRadius: 6,
+      border: "1px solid #9ca3af",
+      fontSize: 14,
+      boxSizing: "border-box",
+    },
     textarea: {
       display: "block",
       marginBottom: 12,
@@ -185,6 +203,15 @@ export default function Home() {
       fontSize: 16,
       marginTop: 8,
       marginBottom: 12,
+      boxSizing: "border-box",
+      background: "#ffffff",
+    },
+    smallSelect: {
+      padding: 8,
+      width: "100%",
+      borderRadius: 6,
+      border: "1px solid #9ca3af",
+      fontSize: 14,
       boxSizing: "border-box",
       background: "#ffffff",
     },
@@ -249,6 +276,7 @@ export default function Home() {
       borderBottom: "1px solid #e5e7eb",
       padding: 10,
       whiteSpace: "nowrap",
+      verticalAlign: "top",
     },
     signedBadge: {
       display: "inline-block",
@@ -343,9 +371,15 @@ export default function Home() {
 
   function formatDateTime(value) {
     if (!value) return "—";
-
     return new Date(value).toLocaleString();
   }
+
+  const signedCount = workers.filter((workerItem) =>
+    acknowledgements.some((ack) => ack.worker_id === workerItem.id)
+  ).length;
+
+  const totalWorkerCount = workers.length;
+  const pendingCount = totalWorkerCount - signedCount;
 
   function generatePdfReport() {
     if (!assignment || !topic || !project) {
@@ -561,13 +595,6 @@ export default function Home() {
 
     reportWindow.document.close();
   }
-
-  const signedCount = workers.filter((workerItem) =>
-    acknowledgements.some((ack) => ack.worker_id === workerItem.id)
-  ).length;
-
-  const totalWorkerCount = workers.length;
-  const pendingCount = totalWorkerCount - signedCount;
 
   async function login() {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -994,6 +1021,61 @@ export default function Home() {
     setNewWorkerRole("worker");
     await refreshAdminLists();
     alert("Worker created.");
+  }
+
+  async function updateWorker(workerItem) {
+    if (!isAdmin) {
+      alert("You do not have access to update workers.");
+      return;
+    }
+
+    if (!workerItem.full_name?.trim()) {
+      alert("Worker name cannot be blank.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("workers")
+      .update({
+        full_name: workerItem.full_name.trim(),
+        phone: workerItem.phone?.trim() || null,
+        preferred_language: workerItem.preferred_language || "english",
+        role: workerItem.role || "worker",
+      })
+      .eq("id", workerItem.id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    if (worker?.id === workerItem.id) {
+      setWorker({
+        ...worker,
+        full_name: workerItem.full_name.trim(),
+        phone: workerItem.phone?.trim() || null,
+        preferred_language: workerItem.preferred_language || "english",
+        role: workerItem.role || "worker",
+      });
+    }
+
+    await loadAllWorkers();
+
+    if (selectedProjectId) {
+      await loadProjectWorkers(selectedProjectId);
+    }
+
+    alert("Worker updated.");
+  }
+
+  function updateWorkerField(workerId, fieldName, value) {
+    setAllWorkers((currentWorkers) =>
+      currentWorkers.map((workerItem) =>
+        workerItem.id === workerId
+          ? { ...workerItem, [fieldName]: value }
+          : workerItem
+      )
+    );
   }
 
   async function createSafetyTopic() {
@@ -1814,6 +1896,118 @@ export default function Home() {
                   Link Worker
                 </button>
               </div>
+            </div>
+
+            <div style={styles.card}>
+              <h3>Manage Workers</h3>
+              <p>
+                Edit worker names, phone numbers, preferred language, and role.
+                Worker emails are shown here but should be changed carefully in
+                Supabase Authentication if login email needs to change.
+              </p>
+
+              {allWorkers.length > 0 ? (
+                <div style={styles.tableWrap}>
+                  <table style={styles.table}>
+                    <thead>
+                      <tr>
+                        <th style={styles.th}>Name</th>
+                        <th style={styles.th}>Email</th>
+                        <th style={styles.th}>Phone</th>
+                        <th style={styles.th}>Language</th>
+                        <th style={styles.th}>Role</th>
+                        <th style={styles.th}>Action</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {allWorkers.map((workerItem) => (
+                        <tr key={workerItem.id}>
+                          <td style={styles.td}>
+                            <input
+                              style={styles.smallInput}
+                              value={workerItem.full_name || ""}
+                              onChange={(event) =>
+                                updateWorkerField(
+                                  workerItem.id,
+                                  "full_name",
+                                  event.target.value
+                                )
+                              }
+                            />
+                          </td>
+
+                          <td style={styles.td}>
+                            {workerItem.email || "No email"}
+                          </td>
+
+                          <td style={styles.td}>
+                            <input
+                              style={styles.smallInput}
+                              value={workerItem.phone || ""}
+                              onChange={(event) =>
+                                updateWorkerField(
+                                  workerItem.id,
+                                  "phone",
+                                  event.target.value
+                                )
+                              }
+                            />
+                          </td>
+
+                          <td style={styles.td}>
+                            <select
+                              style={styles.smallSelect}
+                              value={workerItem.preferred_language || "english"}
+                              onChange={(event) =>
+                                updateWorkerField(
+                                  workerItem.id,
+                                  "preferred_language",
+                                  event.target.value
+                                )
+                              }
+                            >
+                              <option value="english">English</option>
+                              <option value="spanish">Spanish</option>
+                            </select>
+                          </td>
+
+                          <td style={styles.td}>
+                            <select
+                              style={styles.smallSelect}
+                              value={workerItem.role || "worker"}
+                              onChange={(event) =>
+                                updateWorkerField(
+                                  workerItem.id,
+                                  "role",
+                                  event.target.value
+                                )
+                              }
+                            >
+                              <option value="worker">Worker</option>
+                              <option value="superintendent">
+                                Superintendent
+                              </option>
+                              <option value="admin">Admin</option>
+                            </select>
+                          </td>
+
+                          <td style={styles.td}>
+                            <button
+                              onClick={() => updateWorker(workerItem)}
+                              style={styles.saveButton}
+                            >
+                              Save
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p style={styles.warning}>No workers found.</p>
+              )}
             </div>
           </div>
         )}
