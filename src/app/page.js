@@ -3012,7 +3012,9 @@ export default function Home() {
                   ) : (
                     <p style={styles.warning}>No assignments found.</p>
                   )}
-                </div><div style={styles.card}>
+                </div>
+
+                <div style={styles.card}>
                   <h4 style={{ marginTop: 0 }}>Weekly Report</h4>
 
                   <p style={{ color: "#4b5563" }}>
