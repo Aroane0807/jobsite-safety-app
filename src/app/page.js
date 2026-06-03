@@ -1279,49 +1279,70 @@ export default function Home() {
   }
 
   async function createAssignment() {
-    if (!isAdmin) {
-      alert("You do not have access to create assignments.");
-      return;
-    }
-
-    if (!assignmentProjectId) {
-      alert("Choose a project.");
-      return;
-    }
-
-    if (!assignmentTopicId) {
-      alert("Choose a safety topic.");
-      return;
-    }
-
-    if (!assignmentDate) {
-      alert("Choose an assignment date.");
-      return;
-    }
-
-    const { error } = await supabase.from("daily_assignments").insert({
-      project_id: assignmentProjectId,
-      topic_id: assignmentTopicId,
-      assigned_date: assignmentDate,
-    });
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setAssignmentProjectId("");
-    setAssignmentTopicId("");
-    setAssignmentDate("");
-
-    if (assignmentProjectId === selectedProjectId) {
-      await loadLatestAssignmentForProject(selectedProjectId, worker);
-    }
-
-    await loadAllAssignments();
-
-    alert("Safety topic assigned to project.");
+  if (!isAdmin) {
+    alert("You do not have access to create assignments.");
+    return;
   }
+
+  if (!assignmentProjectId) {
+    alert("Choose a project.");
+    return;
+  }
+
+  if (!assignmentTopicId) {
+    alert("Choose a safety topic.");
+    return;
+  }
+
+  if (!assignmentDate) {
+    alert("Choose an assignment date.");
+    return;
+  }
+
+  const { data: existingAssignment, error: duplicateCheckError } =
+    await supabase
+      .from("daily_assignments")
+      .select("id")
+      .eq("project_id", assignmentProjectId)
+      .eq("topic_id", assignmentTopicId)
+      .eq("assigned_date", assignmentDate)
+      .maybeSingle();
+
+  if (duplicateCheckError) {
+    alert(duplicateCheckError.message);
+    return;
+  }
+
+  if (existingAssignment) {
+    alert(
+      "This safety topic is already assigned to this project for that date."
+    );
+    return;
+  }
+
+  const { error } = await supabase.from("daily_assignments").insert({
+    project_id: assignmentProjectId,
+    topic_id: assignmentTopicId,
+    assigned_date: assignmentDate,
+  });
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  setAssignmentProjectId("");
+  setAssignmentTopicId("");
+  setAssignmentDate("");
+
+  if (assignmentProjectId === selectedProjectId) {
+    await loadLatestAssignmentForProject(selectedProjectId, worker);
+  }
+
+  await loadAllAssignments();
+
+  alert("Safety topic assigned to project.");
+}
 
   function handleProjectChange(event) {
     const newProjectId = event.target.value;
