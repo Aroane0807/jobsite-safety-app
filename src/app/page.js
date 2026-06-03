@@ -2435,13 +2435,15 @@ await loadAllAssignments();
               </div>
             )}
 
-            {adminTab === "assignments" && (
+                       {adminTab === "assignments" && (
               <div style={styles.card}>
                 <h3>Manage Assignments</h3>
-                <p>Assign safety topics to projects for a specific date.</p>
+                <p>
+                  Assign safety topics to projects and review previous assignments.
+                </p>
 
                 <div style={styles.card}>
-                  <h4 style={{ marginTop: 0 }}>Assign Topic to Project</h4>
+                  <h4 style={{ marginTop: 0 }}>Create New Assignment</h4>
 
                   <label>
                     Project
@@ -2498,8 +2500,48 @@ await loadAllAssignments();
                     Assign Topic
                   </button>
                 </div>
+
+                <div style={styles.card}>
+                  <h4 style={{ marginTop: 0 }}>Existing Assignments</h4>
+
+                  {allAssignments.length > 0 ? (
+                    <div style={styles.tableWrap}>
+                      <table style={styles.table}>
+                        <thead>
+                          <tr>
+                            <th style={styles.th}>Assigned Date</th>
+                            <th style={styles.th}>Project</th>
+                            <th style={styles.th}>Safety Topic</th>
+                          </tr>
+                        </thead>
+
+                        <tbody>
+                          {allAssignments.map((assignmentItem) => (
+                            <tr key={assignmentItem.id}>
+                              <td style={styles.td}>
+                                {assignmentItem.assigned_date}
+                              </td>
+
+                              <td style={styles.td}>
+                                {assignmentItem.projects?.project_name ||
+                                  "No project"}
+                              </td>
+
+                              <td style={styles.td}>
+                                {assignmentItem.safety_topics?.title ||
+                                  "No topic"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p style={styles.warning}>No assignments found.</p>
+                  )}
+                </div>
               </div>
-            )}
+            )} 
           </div>
         )}
       </div>
