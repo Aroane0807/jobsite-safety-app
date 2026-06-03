@@ -89,9 +89,9 @@ export default function Home() {
       : topic?.english_content || "No English content available.";
 
   const acknowledgmentText =
-    language === "spanish"
-      ? "Al marcar esta casilla, confirmo que he leído, entiendo y aplicaré los procedimientos de seguridad descritos en esta charla diaria de seguridad mientras trabajo en el sitio de trabajo."
-      : "By checking this box, I confirm that I have read, understand, and will implement the safety procedures outlined in this daily safety briefing while working on the jobsite.";
+  language === "spanish"
+    ? "Al marcar esta casilla, confirmo que se me ha proporcionado esta información de seguridad, que he tenido la oportunidad de revisar el documento adjunto, que entiendo los requisitos de seguridad y que acepto seguir estos procedimientos mientras trabajo en este sitio de trabajo. Entiendo que no seguir estos procedimientos de seguridad puede resultar en que sea retirado de la tarea o del sitio de trabajo."
+    : "By checking this box, I confirm that I have been provided this safety information, have had the opportunity to review the attached document, understand the safety requirements, and agree to follow these procedures while working on this jobsite. I understand that failure to follow these safety procedures may result in removal from the task or jobsite.";
 
   const acknowledgeButtonText =
     language === "spanish"
