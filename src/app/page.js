@@ -1416,7 +1416,107 @@ async function updateSafetyTopic(topicItem) {
 
   alert("Safety topic updated.");
 }
+function getWeeklyPlannerDate(dayIndex) {
+  if (!weeklyPlannerStartDate) return "";
 
+  const date = new Date(`${weeklyPlannerStartDate}T00:00:00`);
+  date.setDate(date.getDate() + dayIndex);
+
+  return date.toISOString().split("T")[0];
+}
+
+function updateWeeklyPlannerTopic(dayName, topicId) {
+  setWeeklyPlannerTopics((currentTopics) => ({
+    ...currentTopics,
+    [dayName]: topicId,
+  }));
+}
+
+async function createWeeklyAssignments() {
+  if (!isAdmin) {
+    alert("You do not have access to create assignments.");
+    return;
+  }
+
+  if (!weeklyPlannerProjectId) {
+    alert("Choose a project for the weekly planner.");
+    return;
+  }
+
+  if (!weeklyPlannerStartDate) {
+    alert("Choose the Monday date for the weekly planner.");
+    return;
+  }
+
+  const days = [
+    { key: "monday", label: "Monday", offset: 0 },
+    { key: "tuesday", label: "Tuesday", offset: 1 },
+    { key: "wednesday", label: "Wednesday", offset: 2 },
+    { key: "thursday", label: "Thursday", offset: 3 },
+    { key: "friday", label: "Friday", offset: 4 },
+  ];
+
+  const assignmentsToCreate = days
+    .map((day) => ({
+      dayLabel: day.label,
+      project_id: weeklyPlannerProjectId,
+      topic_id: weeklyPlannerTopics[day.key],
+      assigned_date: getWeeklyPlannerDate(day.offset),
+    }))
+    .filter((item) => item.topic_id);
+
+  if (assignmentsToCreate.length === 0) {
+    alert("Choose at least one safety topic for the week.");
+    return;
+  }
+
+  let createdCount = 0;
+  let skippedCount = 0;
+
+  for (const assignmentItem of assignmentsToCreate) {
+    const { data: existingAssignment, error: duplicateCheckError } =
+      await supabase
+        .from("daily_assignments")
+        .select("id")
+        .eq("project_id", assignmentItem.project_id)
+        .eq("topic_id", assignmentItem.topic_id)
+        .eq("assigned_date", assignmentItem.assigned_date)
+        .maybeSingle();
+
+    if (duplicateCheckError) {
+      alert(duplicateCheckError.message);
+      return;
+    }
+
+    if (existingAssignment) {
+      skippedCount += 1;
+      continue;
+    }
+
+    const { error } = await supabase.from("daily_assignments").insert({
+      project_id: assignmentItem.project_id,
+      topic_id: assignmentItem.topic_id,
+      assigned_date: assignmentItem.assigned_date,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    createdCount += 1;
+  }
+
+  await loadAllAssignments();
+
+  if (weeklyPlannerProjectId === selectedProjectId) {
+    await loadLatestAssignmentForProject(selectedProjectId, worker);
+  }
+
+  alert(
+    `Weekly assignments complete. Created: ${createdCount}. Skipped duplicates: ${skippedCount}.`
+  );
+}
 async function createAssignment() {
   if (!isAdmin) {
     alert("You do not have access to create assignments.");
