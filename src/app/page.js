@@ -11,13 +11,14 @@ export default function Home() {
   const [allProjects, setAllProjects] = useState([]);
   const [allWorkers, setAllWorkers] = useState([]);
   const [allTopics, setAllTopics] = useState([]);
-const [allAssignments, setAllAssignments] = useState([]);
+  const [allAssignments, setAllAssignments] = useState([]);
+
   const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [topic, setTopic] = useState(null);
   const [project, setProject] = useState(null);
   const [assignment, setAssignment] = useState(null);
-  const [acknowledgements, setAcknowledgements] = useState([]);
+  const [topic, setTopic] = useState(null);
   const [workers, setWorkers] = useState([]);
+  const [acknowledgements, setAcknowledgements] = useState([]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,9 +30,6 @@ const [allAssignments, setAllAssignments] = useState([]);
   const [language, setLanguage] = useState("english");
 
   const [adminTab, setAdminTab] = useState("projects");
-  const [topicSearch, setTopicSearch] = useState("");
-  const [selectedTopicId, setSelectedTopicId] = useState("");
-  const [showAddTopicForm, setShowAddTopicForm] = useState(false);
 
   const [newProjectName, setNewProjectName] = useState("");
 
@@ -40,6 +38,13 @@ const [allAssignments, setAllAssignments] = useState([]);
   const [newWorkerPhone, setNewWorkerPhone] = useState("");
   const [newWorkerLanguage, setNewWorkerLanguage] = useState("english");
   const [newWorkerRole, setNewWorkerRole] = useState("worker");
+
+  const [linkWorkerId, setLinkWorkerId] = useState("");
+  const [linkProjectId, setLinkProjectId] = useState("");
+
+  const [topicSearch, setTopicSearch] = useState("");
+  const [selectedTopicId, setSelectedTopicId] = useState("");
+  const [showAddTopicForm, setShowAddTopicForm] = useState(false);
 
   const [newTopicTitle, setNewTopicTitle] = useState("");
   const [newTopicEnglish, setNewTopicEnglish] = useState("");
@@ -53,9 +58,6 @@ const [allAssignments, setAllAssignments] = useState([]);
   const [assignmentProjectId, setAssignmentProjectId] = useState("");
   const [assignmentTopicId, setAssignmentTopicId] = useState("");
   const [assignmentDate, setAssignmentDate] = useState("");
-
-  const [linkWorkerId, setLinkWorkerId] = useState("");
-  const [linkProjectId, setLinkProjectId] = useState("");
 
   const isAdmin =
     worker?.role === "admin" || worker?.role === "superintendent";
@@ -74,6 +76,42 @@ const [allAssignments, setAllAssignments] = useState([]);
     );
   });
 
+  const signedCount = workers.filter((workerItem) =>
+    acknowledgements.some((ack) => ack.worker_id === workerItem.id)
+  ).length;
+
+  const totalWorkerCount = workers.length;
+  const pendingCount = totalWorkerCount - signedCount;
+
+  const topicText =
+    language === "spanish"
+      ? topic?.spanish_content || "No hay contenido en español disponible."
+      : topic?.english_content || "No English content available.";
+
+  const acknowledgmentText =
+    language === "spanish"
+      ? "Al marcar esta casilla, confirmo que he leído, entiendo y aplicaré los procedimientos de seguridad descritos en esta charla diaria de seguridad mientras trabajo en el sitio de trabajo."
+      : "By checking this box, I confirm that I have read, understand, and will implement the safety procedures outlined in this daily safety briefing while working on the jobsite.";
+
+  const acknowledgeButtonText =
+    language === "spanish"
+      ? alreadyAcknowledged
+        ? "Ya Reconocido"
+        : "Reconocer Tema de Seguridad"
+      : alreadyAcknowledged
+      ? "Already Acknowledged"
+      : "Acknowledge Safety Topic";
+
+  const alreadyAcknowledgedMessage =
+    language === "spanish"
+      ? "Ya ha reconocido este tema de seguridad."
+      : "You have already acknowledged this safety topic.";
+
+  const successMessage =
+    language === "spanish"
+      ? "Tema de seguridad reconocido correctamente."
+      : "Safety topic acknowledged successfully.";
+
   const styles = {
     page: {
       minHeight: "100vh",
@@ -85,14 +123,6 @@ const [allAssignments, setAllAssignments] = useState([]);
     container: {
       maxWidth: 1100,
       margin: "0 auto",
-    },
-    card: {
-      background: "#ffffff",
-      border: "1px solid #d1d5db",
-      borderRadius: 12,
-      padding: 20,
-      marginTop: 16,
-      boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
     },
     header: {
       background: "#111827",
@@ -109,6 +139,14 @@ const [allAssignments, setAllAssignments] = useState([]);
       marginTop: 8,
       marginBottom: 0,
       color: "#d1d5db",
+    },
+    card: {
+      background: "#ffffff",
+      border: "1px solid #d1d5db",
+      borderRadius: 12,
+      padding: 20,
+      marginTop: 16,
+      boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
     },
     button: {
       padding: "12px 18px",
@@ -155,19 +193,6 @@ const [allAssignments, setAllAssignments] = useState([]);
       width: "100%",
       maxWidth: 360,
     },
-    documentButton: {
-      display: "inline-block",
-      padding: "14px 20px",
-      borderRadius: 8,
-      border: "none",
-      background: "#059669",
-      color: "#ffffff",
-      cursor: "pointer",
-      fontSize: 16,
-      fontWeight: "bold",
-      marginTop: 16,
-      textDecoration: "none",
-    },
     disabledButton: {
       padding: "14px 20px",
       borderRadius: 8,
@@ -194,6 +219,19 @@ const [allAssignments, setAllAssignments] = useState([]);
       border: "1px solid #9ca3af",
       cursor: "pointer",
       fontSize: 15,
+    },
+    documentButton: {
+      display: "inline-block",
+      padding: "14px 20px",
+      borderRadius: 8,
+      border: "none",
+      background: "#059669",
+      color: "#ffffff",
+      cursor: "pointer",
+      fontSize: 16,
+      fontWeight: "bold",
+      marginTop: 16,
+      textDecoration: "none",
     },
     input: {
       display: "block",
@@ -347,12 +385,6 @@ const [allAssignments, setAllAssignments] = useState([]);
       cursor: "pointer",
       fontSize: 15,
     },
-    formGrid: {
-      display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-      gap: 16,
-      alignItems: "start",
-    },
     inlineGrid: {
       display: "grid",
       gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
@@ -377,35 +409,6 @@ const [allAssignments, setAllAssignments] = useState([]);
     },
   };
 
-  const topicText =
-    language === "spanish"
-      ? topic?.spanish_content || "No hay contenido en español disponible."
-      : topic?.english_content || "No English content available.";
-
-  const acknowledgmentText =
-    language === "spanish"
-      ? "Al marcar esta casilla, confirmo que he leído, entiendo y aplicaré los procedimientos de seguridad descritos en esta charla diaria de seguridad mientras trabajo en el sitio de trabajo."
-      : "By checking this box, I confirm that I have read, understand, and will implement the safety procedures outlined in this daily safety briefing while working on the jobsite.";
-
-  const acknowledgeButtonText =
-    language === "spanish"
-      ? alreadyAcknowledged
-        ? "Ya Reconocido"
-        : "Reconocer Tema de Seguridad"
-      : alreadyAcknowledged
-      ? "Already Acknowledged"
-      : "Acknowledge Safety Topic";
-
-  const alreadyAcknowledgedMessage =
-    language === "spanish"
-      ? "Ya ha reconocido este tema de seguridad."
-      : "You have already acknowledged this safety topic.";
-
-  const successMessage =
-    language === "spanish"
-      ? "Tema de seguridad reconocido correctamente."
-      : "Safety topic acknowledged successfully.";
-
   function escapeHtml(value) {
     if (!value) return "";
 
@@ -417,21 +420,837 @@ const [allAssignments, setAllAssignments] = useState([]);
       .replaceAll("'", "&#039;");
   }
 
-  function getAcknowledgementForWorker(workerId) {
-    return acknowledgements.find((ack) => ack.worker_id === workerId);
-  }
-
   function formatDateTime(value) {
     if (!value) return "—";
     return new Date(value).toLocaleString();
   }
 
-  const signedCount = workers.filter((workerItem) =>
-    acknowledgements.some((ack) => ack.worker_id === workerItem.id)
-  ).length;
+  function getAcknowledgementForWorker(workerId) {
+    return acknowledgements.find((ack) => ack.worker_id === workerId);
+  }
 
-  const totalWorkerCount = workers.length;
-  const pendingCount = totalWorkerCount - signedCount;
+  async function login() {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      alert(error.message);
+    } else {
+      setUser(data.user);
+    }
+  }
+
+  async function logout() {
+    await supabase.auth.signOut();
+
+    setUser(null);
+    setWorker(null);
+    setProjects([]);
+    setAllProjects([]);
+    setAllWorkers([]);
+    setAllTopics([]);
+    setAllAssignments([]);
+    setSelectedProjectId("");
+    setProject(null);
+    setAssignment(null);
+    setTopic(null);
+    setWorkers([]);
+    setAcknowledgements([]);
+    setChecked(false);
+    setMessage("");
+    setAlreadyAcknowledged(false);
+    setView("worker");
+    setLanguage("english");
+    setAdminTab("projects");
+  }
+
+  async function loadWorker(currentUser) {
+    if (!currentUser?.email) return null;
+
+    const { data, error } = await supabase
+      .from("workers")
+      .select("*")
+      .eq("email", currentUser.email)
+      .maybeSingle();
+
+    if (error) {
+      console.log(error);
+      return null;
+    }
+
+    if (!data) {
+      setMessage(
+        "No worker profile found for this email. Add this email to the workers table in Supabase."
+      );
+      return null;
+    }
+
+    setWorker(data);
+
+    if (data.role !== "admin" && data.role !== "superintendent") {
+      setView("worker");
+    }
+
+    setLanguage(data.preferred_language === "spanish" ? "spanish" : "english");
+
+    return data;
+  }
+
+  async function loadProjects() {
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("active", true)
+      .order("project_name", { ascending: true });
+
+    if (error) {
+      console.log(error);
+      setProjects([]);
+      return [];
+    }
+
+    setProjects(data || []);
+    return data || [];
+  }
+
+  async function loadAllProjects() {
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .order("project_name", { ascending: true });
+
+    if (error) {
+      console.log(error);
+      setAllProjects([]);
+      return [];
+    }
+
+    setAllProjects(data || []);
+    return data || [];
+  }
+
+  async function loadAllWorkers() {
+    const { data, error } = await supabase
+      .from("workers")
+      .select("*")
+      .order("full_name", { ascending: true });
+
+    if (error) {
+      console.log(error);
+      setAllWorkers([]);
+      return [];
+    }
+
+    setAllWorkers(data || []);
+    return data || [];
+  }
+
+  async function loadAllTopics() {
+    const { data, error } = await supabase
+      .from("safety_topics")
+      .select("*")
+      .order("title", { ascending: true });
+
+    if (error) {
+      console.log(error);
+      setAllTopics([]);
+      return [];
+    }
+
+    setAllTopics(data || []);
+    return data || [];
+  }
+
+  async function loadAllAssignments() {
+    const { data: assignmentData, error: assignmentError } = await supabase
+      .from("daily_assignments")
+      .select("id, assigned_date, project_id, topic_id")
+      .order("assigned_date", { ascending: false });
+
+    if (assignmentError) {
+      console.log(assignmentError);
+      setAllAssignments([]);
+      return [];
+    }
+
+    const { data: projectData, error: projectError } = await supabase
+      .from("projects")
+      .select("id, project_name");
+
+    if (projectError) {
+      console.log(projectError);
+    }
+
+    const { data: topicData, error: topicError } = await supabase
+      .from("safety_topics")
+      .select("id, title");
+
+    if (topicError) {
+      console.log(topicError);
+    }
+
+    const assignmentsWithNames = (assignmentData || []).map(
+      (assignmentItem) => {
+        const matchingProject = (projectData || []).find(
+          (projectItem) => projectItem.id === assignmentItem.project_id
+        );
+
+        const matchingTopic = (topicData || []).find(
+          (topicItem) => topicItem.id === assignmentItem.topic_id
+        );
+
+        return {
+          ...assignmentItem,
+          project_name: matchingProject?.project_name || "No project",
+          topic_title: matchingTopic?.title || "No topic",
+        };
+      }
+    );
+
+    setAllAssignments(assignmentsWithNames);
+    return assignmentsWithNames;
+  }
+
+  async function refreshAdminLists() {
+    const projectList = await loadProjects();
+    await loadAllProjects();
+    await loadAllWorkers();
+    await loadAllTopics();
+    await loadAllAssignments();
+
+    if (!selectedProjectId && projectList.length > 0) {
+      setSelectedProjectId(projectList[0].id);
+    }
+  }
+
+  async function loadProject(projectId) {
+    if (!projectId) {
+      setProject(null);
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("id", projectId)
+      .maybeSingle();
+
+    if (error) {
+      console.log(error);
+      setProject(null);
+      return null;
+    }
+
+    setProject(data);
+    return data;
+  }
+
+  async function loadProjectWorkers(projectId) {
+    if (!projectId) {
+      setWorkers([]);
+      return [];
+    }
+
+    const { data: projectWorkerData, error: projectWorkerError } =
+      await supabase
+        .from("worker_projects")
+        .select("worker_id")
+        .eq("project_id", projectId);
+
+    if (projectWorkerError) {
+      console.log(projectWorkerError);
+      setWorkers([]);
+      return [];
+    }
+
+    const workerIds = (projectWorkerData || []).map((row) => row.worker_id);
+
+    if (workerIds.length === 0) {
+      setWorkers([]);
+      return [];
+    }
+
+    const { data: workerData, error: workerError } = await supabase
+      .from("workers")
+      .select("*")
+      .in("id", workerIds)
+      .order("full_name", { ascending: true });
+
+    if (workerError) {
+      console.log(workerError);
+      setWorkers([]);
+      return [];
+    }
+
+    setWorkers(workerData || []);
+    return workerData || [];
+  }
+
+  async function loadLatestAssignmentForProject(projectId, currentWorker) {
+    if (!projectId) {
+      setAssignment(null);
+      setTopic(null);
+      setAcknowledgements([]);
+      setWorkers([]);
+      setAlreadyAcknowledged(false);
+      setChecked(false);
+      setMessage("");
+      return;
+    }
+
+    setChecked(false);
+    setAlreadyAcknowledged(false);
+    setMessage("");
+
+    await loadProject(projectId);
+    await loadProjectWorkers(projectId);
+
+    const { data, error } = await supabase
+      .from("daily_assignments")
+      .select("id, assigned_date, project_id, safety_topics(*)")
+      .eq("project_id", projectId)
+      .order("assigned_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.log(error);
+      setAssignment(null);
+      setTopic(null);
+      setAcknowledgements([]);
+      return;
+    }
+
+    if (!data) {
+      setAssignment(null);
+      setTopic(null);
+      setAcknowledgements([]);
+      setMessage("No safety topic has been assigned to this project yet.");
+      return;
+    }
+
+    setAssignment(data);
+    setTopic(data.safety_topics);
+
+    const { data: ackData, error: ackError } = await supabase
+      .from("acknowledgements")
+      .select("*")
+      .eq("assignment_id", data.id)
+      .order("acknowledged_at", { ascending: false });
+
+    if (ackError) {
+      console.log(ackError);
+      setAcknowledgements([]);
+    } else {
+      setAcknowledgements(ackData || []);
+    }
+
+    if (currentWorker) {
+      const { data: existingAck } = await supabase
+        .from("acknowledgements")
+        .select("*")
+        .eq("assignment_id", data.id)
+        .eq("worker_id", currentWorker.id)
+        .maybeSingle();
+
+      if (existingAck) {
+        setAlreadyAcknowledged(true);
+        setMessage(alreadyAcknowledgedMessage);
+      } else {
+        setAlreadyAcknowledged(false);
+        setMessage("");
+      }
+    }
+  }
+
+  async function workerIsAssignedToProject(currentWorker, projectId) {
+    if (!currentWorker || !projectId) return false;
+
+    const { data, error } = await supabase
+      .from("worker_projects")
+      .select("*")
+      .eq("worker_id", currentWorker.id)
+      .eq("project_id", projectId)
+      .maybeSingle();
+
+    if (error) {
+      console.log(error);
+      return false;
+    }
+
+    return Boolean(data);
+  }
+
+  async function acknowledge() {
+    if (!checked) {
+      alert(
+        language === "spanish"
+          ? "Marque la casilla de reconocimiento antes de enviar."
+          : "Please check the acknowledgment box before submitting."
+      );
+      return;
+    }
+
+    if (!assignment) {
+      alert(
+        language === "spanish"
+          ? "No se encontró una asignación diaria."
+          : "No daily assignment found."
+      );
+      return;
+    }
+
+    if (!worker) {
+      alert(
+        language === "spanish"
+          ? "No se encontró un perfil de trabajador para este inicio de sesión."
+          : "No worker profile found for this login. Make sure this email exists in the workers table."
+      );
+      return;
+    }
+
+    const isAssigned = await workerIsAssignedToProject(
+      worker,
+      selectedProjectId
+    );
+
+    if (!isAssigned) {
+      alert(
+        language === "spanish"
+          ? "Este trabajador no está asignado a este proyecto."
+          : "This worker is not assigned to this project."
+      );
+      return;
+    }
+
+    const { data: existingAck } = await supabase
+      .from("acknowledgements")
+      .select("*")
+      .eq("assignment_id", assignment.id)
+      .eq("worker_id", worker.id)
+      .maybeSingle();
+
+    if (existingAck) {
+      setAlreadyAcknowledged(true);
+      setMessage(alreadyAcknowledgedMessage);
+      return;
+    }
+
+    const { error } = await supabase.from("acknowledgements").insert({
+      assignment_id: assignment.id,
+      worker_id: worker.id,
+    });
+
+    if (error) {
+      alert(error.message);
+    } else {
+      setAlreadyAcknowledged(true);
+      setMessage(successMessage);
+
+      const { data: updatedAckData } = await supabase
+        .from("acknowledgements")
+        .select("*")
+        .eq("assignment_id", assignment.id)
+        .order("acknowledged_at", { ascending: false });
+
+      setAcknowledgements(updatedAckData || []);
+    }
+  }
+
+  async function createProject() {
+    if (!isAdmin) {
+      alert("You do not have access to create projects.");
+      return;
+    }
+
+    if (!newProjectName.trim()) {
+      alert("Enter a project name.");
+      return;
+    }
+
+    const { error } = await supabase.from("projects").insert({
+      project_name: newProjectName.trim(),
+      active: true,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setNewProjectName("");
+    await refreshAdminLists();
+    alert("Project created.");
+  }
+
+  function updateProjectField(projectId, fieldName, value) {
+    setAllProjects((currentProjects) =>
+      currentProjects.map((projectItem) =>
+        projectItem.id === projectId
+          ? { ...projectItem, [fieldName]: value }
+          : projectItem
+      )
+    );
+  }
+
+  async function updateProject(projectItem) {
+    if (!isAdmin) {
+      alert("You do not have access to update projects.");
+      return;
+    }
+
+    if (!projectItem.project_name?.trim()) {
+      alert("Project name cannot be blank.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("projects")
+      .update({
+        project_name: projectItem.project_name.trim(),
+        active: Boolean(projectItem.active),
+      })
+      .eq("id", projectItem.id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadProjects();
+    await loadAllProjects();
+
+    if (selectedProjectId === projectItem.id) {
+      await loadProject(projectItem.id);
+    }
+
+    alert("Project updated.");
+  }
+
+  async function createWorker() {
+    if (!isAdmin) {
+      alert("You do not have access to create workers.");
+      return;
+    }
+
+    if (!newWorkerName.trim()) {
+      alert("Enter worker name.");
+      return;
+    }
+
+    if (!newWorkerEmail.trim()) {
+      alert("Enter worker email.");
+      return;
+    }
+
+    const { error } = await supabase.from("workers").insert({
+      full_name: newWorkerName.trim(),
+      email: newWorkerEmail.trim(),
+      phone: newWorkerPhone.trim() || null,
+      preferred_language: newWorkerLanguage,
+      role: newWorkerRole,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setNewWorkerName("");
+    setNewWorkerEmail("");
+    setNewWorkerPhone("");
+    setNewWorkerLanguage("english");
+    setNewWorkerRole("worker");
+    await refreshAdminLists();
+    alert("Worker created.");
+  }
+
+  function updateWorkerField(workerId, fieldName, value) {
+    setAllWorkers((currentWorkers) =>
+      currentWorkers.map((workerItem) =>
+        workerItem.id === workerId
+          ? { ...workerItem, [fieldName]: value }
+          : workerItem
+      )
+    );
+  }
+
+  async function updateWorker(workerItem) {
+    if (!isAdmin) {
+      alert("You do not have access to update workers.");
+      return;
+    }
+
+    if (!workerItem.full_name?.trim()) {
+      alert("Worker name cannot be blank.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("workers")
+      .update({
+        full_name: workerItem.full_name.trim(),
+        phone: workerItem.phone?.trim() || null,
+        preferred_language: workerItem.preferred_language || "english",
+        role: workerItem.role || "worker",
+      })
+      .eq("id", workerItem.id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    if (worker?.id === workerItem.id) {
+      setWorker({
+        ...worker,
+        full_name: workerItem.full_name.trim(),
+        phone: workerItem.phone?.trim() || null,
+        preferred_language: workerItem.preferred_language || "english",
+        role: workerItem.role || "worker",
+      });
+    }
+
+    await loadAllWorkers();
+
+    if (selectedProjectId) {
+      await loadProjectWorkers(selectedProjectId);
+    }
+
+    alert("Worker updated.");
+  }
+
+  async function linkWorkerToProject() {
+    if (!isAdmin) {
+      alert("You do not have access to link workers to projects.");
+      return;
+    }
+
+    if (!linkWorkerId) {
+      alert("Choose a worker.");
+      return;
+    }
+
+    if (!linkProjectId) {
+      alert("Choose a project.");
+      return;
+    }
+
+    const { data: existingLink } = await supabase
+      .from("worker_projects")
+      .select("*")
+      .eq("worker_id", linkWorkerId)
+      .eq("project_id", linkProjectId)
+      .maybeSingle();
+
+    if (existingLink) {
+      alert("This worker is already assigned to that project.");
+      return;
+    }
+
+    const { error } = await supabase.from("worker_projects").insert({
+      worker_id: linkWorkerId,
+      project_id: linkProjectId,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setLinkWorkerId("");
+    setLinkProjectId("");
+
+    if (linkProjectId === selectedProjectId) {
+      await loadLatestAssignmentForProject(selectedProjectId, worker);
+    }
+
+    alert("Worker linked to project.");
+  }
+
+  async function createSafetyTopic() {
+    if (!isAdmin) {
+      alert("You do not have access to create safety topics.");
+      return;
+    }
+
+    if (!newTopicTitle.trim()) {
+      alert("Enter a safety topic title.");
+      return;
+    }
+
+    setUploadingDocument(true);
+
+    let finalDocumentName = newTopicDocumentName.trim() || null;
+    let finalDocumentUrl = newTopicDocumentUrl.trim() || null;
+
+    if (newTopicFile) {
+      const safeFileName = newTopicFile.name
+        .replace(/[^a-zA-Z0-9._-]/g, "-")
+        .toLowerCase();
+
+      const filePath = `${Date.now()}-${safeFileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("safety-documents")
+        .upload(filePath, newTopicFile, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (uploadError) {
+        setUploadingDocument(false);
+        alert(uploadError.message);
+        return;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("safety-documents")
+        .getPublicUrl(filePath);
+
+      finalDocumentUrl = publicUrlData.publicUrl;
+
+      if (!finalDocumentName) {
+        finalDocumentName = newTopicFile.name;
+      }
+    }
+
+    const { error } = await supabase.from("safety_topics").insert({
+      title: newTopicTitle.trim(),
+      english_content: newTopicEnglish.trim(),
+      spanish_content: newTopicSpanish.trim(),
+      document_name: finalDocumentName,
+      document_url: finalDocumentUrl,
+    });
+
+    setUploadingDocument(false);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setNewTopicTitle("");
+    setNewTopicEnglish("");
+    setNewTopicSpanish("");
+    setNewTopicDocumentName("");
+    setNewTopicDocumentUrl("");
+    setNewTopicFile(null);
+    setFileInputKey(Date.now());
+    setShowAddTopicForm(false);
+
+    await refreshAdminLists();
+    alert("Safety topic created.");
+  }
+
+  function updateTopicField(topicId, fieldName, value) {
+    setAllTopics((currentTopics) =>
+      currentTopics.map((topicItem) =>
+        topicItem.id === topicId
+          ? { ...topicItem, [fieldName]: value }
+          : topicItem
+      )
+    );
+  }
+
+  async function updateSafetyTopic(topicItem) {
+    if (!isAdmin) {
+      alert("You do not have access to update safety topics.");
+      return;
+    }
+
+    if (!topicItem.title?.trim()) {
+      alert("Safety topic title cannot be blank.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("safety_topics")
+      .update({
+        title: topicItem.title.trim(),
+        english_content: topicItem.english_content || "",
+        spanish_content: topicItem.spanish_content || "",
+        document_name: topicItem.document_name?.trim() || null,
+        document_url: topicItem.document_url?.trim() || null,
+      })
+      .eq("id", topicItem.id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadAllTopics();
+
+    if (topic?.id === topicItem.id) {
+      await loadLatestAssignmentForProject(selectedProjectId, worker);
+    }
+
+    alert("Safety topic updated.");
+  }
+
+  async function createAssignment() {
+    if (!isAdmin) {
+      alert("You do not have access to create assignments.");
+      return;
+    }
+
+    if (!assignmentProjectId) {
+      alert("Choose a project.");
+      return;
+    }
+
+    if (!assignmentTopicId) {
+      alert("Choose a safety topic.");
+      return;
+    }
+
+    if (!assignmentDate) {
+      alert("Choose an assignment date.");
+      return;
+    }
+
+    const { error } = await supabase.from("daily_assignments").insert({
+      project_id: assignmentProjectId,
+      topic_id: assignmentTopicId,
+      assigned_date: assignmentDate,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setAssignmentProjectId("");
+    setAssignmentTopicId("");
+    setAssignmentDate("");
+
+    if (assignmentProjectId === selectedProjectId) {
+      await loadLatestAssignmentForProject(selectedProjectId, worker);
+    }
+
+    await loadAllAssignments();
+
+    alert("Safety topic assigned to project.");
+  }
+
+  function handleProjectChange(event) {
+    const newProjectId = event.target.value;
+    setSelectedProjectId(newProjectId);
+    loadLatestAssignmentForProject(newProjectId, worker);
+  }
+
+  function handleViewChange(nextView) {
+    if ((nextView === "dashboard" || nextView === "admin") && !isAdmin) {
+      setView("worker");
+      alert("You do not have access to that section.");
+      return;
+    }
+
+    setView(nextView);
+  }
 
   function generatePdfReport() {
     if (!assignment || !topic || !project) {
@@ -648,783 +1467,6 @@ const [allAssignments, setAllAssignments] = useState([]);
     reportWindow.document.close();
   }
 
-  async function login() {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      alert(error.message);
-    } else {
-      setUser(data.user);
-    }
-  }
-
-  async function logout() {
-    await supabase.auth.signOut();
-
-    setUser(null);
-    setWorker(null);
-    setProjects([]);
-    setAllProjects([]);
-    setAllWorkers([]);
-    setAllTopics([]);
-    setSelectedProjectId("");
-    setTopic(null);
-    setProject(null);
-    setAssignment(null);
-    setAcknowledgements([]);
-    setWorkers([]);
-    setChecked(false);
-    setMessage("");
-    setAlreadyAcknowledged(false);
-    setView("worker");
-    setLanguage("english");
-    setAdminTab("projects");
-  }
-
-  async function loadWorker(currentUser) {
-    if (!currentUser?.email) return null;
-
-    const { data, error } = await supabase
-      .from("workers")
-      .select("*")
-      .eq("email", currentUser.email)
-      .maybeSingle();
-
-    if (error) {
-      console.log(error);
-      return null;
-    }
-
-    if (!data) {
-      setMessage(
-        "No worker profile found for this email. Add this email to the workers table in Supabase."
-      );
-      return null;
-    }
-
-    setWorker(data);
-
-    if (data.role !== "admin" && data.role !== "superintendent") {
-      setView("worker");
-    }
-
-    if (data.preferred_language === "spanish") {
-      setLanguage("spanish");
-    } else {
-      setLanguage("english");
-    }
-
-    return data;
-  }
-
-  async function loadProjects() {
-    const { data, error } = await supabase
-      .from("projects")
-      .select("*")
-      .eq("active", true)
-      .order("project_name", { ascending: true });
-
-    if (error) {
-      console.log(error);
-      setProjects([]);
-      return [];
-    }
-
-    setProjects(data || []);
-    return data || [];
-  }
-
-  async function loadAllProjects() {
-    const { data, error } = await supabase
-      .from("projects")
-      .select("*")
-      .order("project_name", { ascending: true });
-
-    if (error) {
-      console.log(error);
-      setAllProjects([]);
-      return [];
-    }
-
-    setAllProjects(data || []);
-    return data || [];
-  }
-
-  async function loadAllWorkers() {
-    const { data, error } = await supabase
-      .from("workers")
-      .select("*")
-      .order("full_name", { ascending: true });
-
-    if (error) {
-      console.log(error);
-      setAllWorkers([]);
-      return [];
-    }
-
-    setAllWorkers(data || []);
-    return data || [];
-  }
-
-async function loadAllAssignments() {
-  const { data, error } = await supabase
-    .from("daily_assignments")
-    .select("id, assigned_date, projects(project_name), safety_topics(title)")
-    .order("assigned_date", { ascending: false });
-
-  if (error) {
-    console.log(error);
-    setAllAssignments([]);
-    return [];
-  }
-
-  setAllAssignments(data || []);
-  return data || [];
-}
-
-  async function refreshAdminLists() {
-    const projectList = await loadProjects();
-    await loadAllProjects();
-await loadAllWorkers();
-await loadAllTopics();
-await loadAllAssignments();
-
-    if (!selectedProjectId && projectList.length > 0) {
-      setSelectedProjectId(projectList[0].id);
-    }
-  }
-
-  async function loadProject(projectId) {
-    if (!projectId) {
-      setProject(null);
-      return null;
-    }
-
-    const { data, error } = await supabase
-      .from("projects")
-      .select("*")
-      .eq("id", projectId)
-      .maybeSingle();
-
-    if (error) {
-      console.log(error);
-      setProject(null);
-      return null;
-    }
-
-    setProject(data);
-    return data;
-  }
-
-  async function loadProjectWorkers(projectId) {
-    if (!projectId) {
-      setWorkers([]);
-      return [];
-    }
-
-    const { data: projectWorkerData, error: projectWorkerError } =
-      await supabase
-        .from("worker_projects")
-        .select("worker_id")
-        .eq("project_id", projectId);
-
-    if (projectWorkerError) {
-      console.log(projectWorkerError);
-      setWorkers([]);
-      return [];
-    }
-
-    const workerIds = (projectWorkerData || []).map((row) => row.worker_id);
-
-    if (workerIds.length === 0) {
-      setWorkers([]);
-      return [];
-    }
-
-    const { data: workerData, error: workerError } = await supabase
-      .from("workers")
-      .select("*")
-      .in("id", workerIds)
-      .order("full_name", { ascending: true });
-
-    if (workerError) {
-      console.log(workerError);
-      setWorkers([]);
-      return [];
-    }
-
-    setWorkers(workerData || []);
-    return workerData || [];
-  }
-
-  async function loadLatestAssignmentForProject(projectId, currentWorker) {
-    if (!projectId) {
-      setAssignment(null);
-      setTopic(null);
-      setAcknowledgements([]);
-      setWorkers([]);
-      setAlreadyAcknowledged(false);
-      setChecked(false);
-      setMessage("");
-      return;
-    }
-
-    setChecked(false);
-    setAlreadyAcknowledged(false);
-    setMessage("");
-
-    await loadProject(projectId);
-    await loadProjectWorkers(projectId);
-
-    const { data, error } = await supabase
-      .from("daily_assignments")
-      .select("id, assigned_date, project_id, safety_topics(*)")
-      .eq("project_id", projectId)
-      .order("assigned_date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      console.log(error);
-      setAssignment(null);
-      setTopic(null);
-      setAcknowledgements([]);
-      return;
-    }
-
-    if (!data) {
-      setAssignment(null);
-      setTopic(null);
-      setAcknowledgements([]);
-      setMessage("No safety topic has been assigned to this project yet.");
-      return;
-    }
-
-    setAssignment(data);
-    setTopic(data.safety_topics);
-
-    const { data: ackData, error: ackError } = await supabase
-      .from("acknowledgements")
-      .select("*")
-      .eq("assignment_id", data.id)
-      .order("acknowledged_at", { ascending: false });
-
-    if (ackError) {
-      console.log(ackError);
-      setAcknowledgements([]);
-    } else {
-      setAcknowledgements(ackData || []);
-    }
-
-    if (currentWorker) {
-      const { data: existingAck } = await supabase
-        .from("acknowledgements")
-        .select("*")
-        .eq("assignment_id", data.id)
-        .eq("worker_id", currentWorker.id)
-        .maybeSingle();
-
-      if (existingAck) {
-        setAlreadyAcknowledged(true);
-        setMessage(alreadyAcknowledgedMessage);
-      } else {
-        setAlreadyAcknowledged(false);
-        setMessage("");
-      }
-    }
-  }
-
-  async function workerIsAssignedToProject(currentWorker, projectId) {
-    if (!currentWorker || !projectId) return false;
-
-    const { data, error } = await supabase
-      .from("worker_projects")
-      .select("*")
-      .eq("worker_id", currentWorker.id)
-      .eq("project_id", projectId)
-      .maybeSingle();
-
-    if (error) {
-      console.log(error);
-      return false;
-    }
-
-    return Boolean(data);
-  }
-
-  async function acknowledge() {
-    if (!checked) {
-      alert(
-        language === "spanish"
-          ? "Marque la casilla de reconocimiento antes de enviar."
-          : "Please check the acknowledgment box before submitting."
-      );
-      return;
-    }
-
-    if (!assignment) {
-      alert(
-        language === "spanish"
-          ? "No se encontró una asignación diaria."
-          : "No daily assignment found."
-      );
-      return;
-    }
-
-    if (!worker) {
-      alert(
-        language === "spanish"
-          ? "No se encontró un perfil de trabajador para este inicio de sesión."
-          : "No worker profile found for this login. Make sure this email exists in the workers table."
-      );
-      return;
-    }
-
-    const isAssigned = await workerIsAssignedToProject(
-      worker,
-      selectedProjectId
-    );
-
-    if (!isAssigned) {
-      alert(
-        language === "spanish"
-          ? "Este trabajador no está asignado a este proyecto."
-          : "This worker is not assigned to this project. Add this worker to the project in the worker_projects table."
-      );
-      return;
-    }
-
-    const { data: existingAck } = await supabase
-      .from("acknowledgements")
-      .select("*")
-      .eq("assignment_id", assignment.id)
-      .eq("worker_id", worker.id)
-      .maybeSingle();
-
-    if (existingAck) {
-      setAlreadyAcknowledged(true);
-      setMessage(alreadyAcknowledgedMessage);
-      return;
-    }
-
-    const { error } = await supabase.from("acknowledgements").insert({
-      assignment_id: assignment.id,
-      worker_id: worker.id,
-    });
-
-    if (error) {
-      alert(error.message);
-    } else {
-      setAlreadyAcknowledged(true);
-      setMessage(successMessage);
-
-      const { data: updatedAckData } = await supabase
-        .from("acknowledgements")
-        .select("*")
-        .eq("assignment_id", assignment.id)
-        .order("acknowledged_at", { ascending: false });
-
-      setAcknowledgements(updatedAckData || []);
-    }
-  }
-
-  async function createProject() {
-    if (!isAdmin) {
-      alert("You do not have access to create projects.");
-      return;
-    }
-
-    if (!newProjectName.trim()) {
-      alert("Enter a project name.");
-      return;
-    }
-
-    const { error } = await supabase.from("projects").insert({
-      project_name: newProjectName.trim(),
-      active: true,
-    });
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setNewProjectName("");
-    await refreshAdminLists();
-    alert("Project created.");
-  }
-
-  function updateProjectField(projectId, fieldName, value) {
-    setAllProjects((currentProjects) =>
-      currentProjects.map((projectItem) =>
-        projectItem.id === projectId
-          ? { ...projectItem, [fieldName]: value }
-          : projectItem
-      )
-    );
-  }
-
-  async function updateProject(projectItem) {
-    if (!isAdmin) {
-      alert("You do not have access to update projects.");
-      return;
-    }
-
-    if (!projectItem.project_name?.trim()) {
-      alert("Project name cannot be blank.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("projects")
-      .update({
-        project_name: projectItem.project_name.trim(),
-        active: Boolean(projectItem.active),
-      })
-      .eq("id", projectItem.id);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    await loadProjects();
-    await loadAllProjects();
-
-    if (selectedProjectId === projectItem.id) {
-      await loadProject(projectItem.id);
-    }
-
-    alert("Project updated.");
-  }
-
-  async function createWorker() {
-    if (!isAdmin) {
-      alert("You do not have access to create workers.");
-      return;
-    }
-
-    if (!newWorkerName.trim()) {
-      alert("Enter worker name.");
-      return;
-    }
-
-    if (!newWorkerEmail.trim()) {
-      alert("Enter worker email.");
-      return;
-    }
-
-    const { error } = await supabase.from("workers").insert({
-      full_name: newWorkerName.trim(),
-      email: newWorkerEmail.trim(),
-      phone: newWorkerPhone.trim() || null,
-      preferred_language: newWorkerLanguage,
-      role: newWorkerRole,
-    });
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setNewWorkerName("");
-    setNewWorkerEmail("");
-    setNewWorkerPhone("");
-    setNewWorkerLanguage("english");
-    setNewWorkerRole("worker");
-    await refreshAdminLists();
-    alert("Worker created.");
-  }
-
-  async function updateWorker(workerItem) {
-    if (!isAdmin) {
-      alert("You do not have access to update workers.");
-      return;
-    }
-
-    if (!workerItem.full_name?.trim()) {
-      alert("Worker name cannot be blank.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("workers")
-      .update({
-        full_name: workerItem.full_name.trim(),
-        phone: workerItem.phone?.trim() || null,
-        preferred_language: workerItem.preferred_language || "english",
-        role: workerItem.role || "worker",
-      })
-      .eq("id", workerItem.id);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    if (worker?.id === workerItem.id) {
-      setWorker({
-        ...worker,
-        full_name: workerItem.full_name.trim(),
-        phone: workerItem.phone?.trim() || null,
-        preferred_language: workerItem.preferred_language || "english",
-        role: workerItem.role || "worker",
-      });
-    }
-
-    await loadAllWorkers();
-
-    if (selectedProjectId) {
-      await loadProjectWorkers(selectedProjectId);
-    }
-
-    alert("Worker updated.");
-  }
-
-  function updateWorkerField(workerId, fieldName, value) {
-    setAllWorkers((currentWorkers) =>
-      currentWorkers.map((workerItem) =>
-        workerItem.id === workerId
-          ? { ...workerItem, [fieldName]: value }
-          : workerItem
-      )
-    );
-  }
-
-  async function createSafetyTopic() {
-    if (!isAdmin) {
-      alert("You do not have access to create safety topics.");
-      return;
-    }
-
-    if (!newTopicTitle.trim()) {
-      alert("Enter a safety topic title.");
-      return;
-    }
-
-    setUploadingDocument(true);
-
-    let finalDocumentName = newTopicDocumentName.trim() || null;
-    let finalDocumentUrl = newTopicDocumentUrl.trim() || null;
-
-    if (newTopicFile) {
-      const safeFileName = newTopicFile.name
-        .replace(/[^a-zA-Z0-9._-]/g, "-")
-        .toLowerCase();
-
-      const filePath = `${Date.now()}-${safeFileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("safety-documents")
-        .upload(filePath, newTopicFile, {
-          cacheControl: "3600",
-          upsert: false,
-        });
-
-      if (uploadError) {
-        setUploadingDocument(false);
-        alert(uploadError.message);
-        return;
-      }
-
-      const { data: publicUrlData } = supabase.storage
-        .from("safety-documents")
-        .getPublicUrl(filePath);
-
-      finalDocumentUrl = publicUrlData.publicUrl;
-
-      if (!finalDocumentName) {
-        finalDocumentName = newTopicFile.name;
-      }
-    }
-
-    const { error } = await supabase.from("safety_topics").insert({
-      title: newTopicTitle.trim(),
-      english_content: newTopicEnglish.trim(),
-      spanish_content: newTopicSpanish.trim(),
-      document_name: finalDocumentName,
-      document_url: finalDocumentUrl,
-    });
-
-    setUploadingDocument(false);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setNewTopicTitle("");
-    setNewTopicEnglish("");
-    setNewTopicSpanish("");
-    setNewTopicDocumentName("");
-    setNewTopicDocumentUrl("");
-    setNewTopicFile(null);
-    setFileInputKey(Date.now());
-    setShowAddTopicForm(false);
-
-    await refreshAdminLists();
-    alert("Safety topic created.");
-  }
-
-  function updateTopicField(topicId, fieldName, value) {
-    setAllTopics((currentTopics) =>
-      currentTopics.map((topicItem) =>
-        topicItem.id === topicId
-          ? { ...topicItem, [fieldName]: value }
-          : topicItem
-      )
-    );
-  }
-
-  async function updateSafetyTopic(topicItem) {
-    if (!isAdmin) {
-      alert("You do not have access to update safety topics.");
-      return;
-    }
-
-    if (!topicItem.title?.trim()) {
-      alert("Safety topic title cannot be blank.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("safety_topics")
-      .update({
-        title: topicItem.title.trim(),
-        english_content: topicItem.english_content || "",
-        spanish_content: topicItem.spanish_content || "",
-        document_name: topicItem.document_name?.trim() || null,
-        document_url: topicItem.document_url?.trim() || null,
-      })
-      .eq("id", topicItem.id);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    await loadAllTopics();
-    await loadAllAssignments();
-
-    if (topic?.id === topicItem.id) {
-      await loadLatestAssignmentForProject(selectedProjectId, worker);
-    }
-
-    alert("Safety topic updated.");
-  }
-
-  async function createAssignment() {
-    if (!isAdmin) {
-      alert("You do not have access to create assignments.");
-      return;
-    }
-
-    if (!assignmentProjectId) {
-      alert("Choose a project.");
-      return;
-    }
-
-    if (!assignmentTopicId) {
-      alert("Choose a safety topic.");
-      return;
-    }
-
-    if (!assignmentDate) {
-      alert("Choose an assignment date.");
-      return;
-    }
-
-    const { error } = await supabase.from("daily_assignments").insert({
-      project_id: assignmentProjectId,
-      topic_id: assignmentTopicId,
-      assigned_date: assignmentDate,
-    });
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setAssignmentProjectId("");
-    setAssignmentTopicId("");
-    setAssignmentDate("");
-
-        if (assignmentProjectId === selectedProjectId) {
-      await loadLatestAssignmentForProject(selectedProjectId, worker);
-    }
-
-    await loadAllAssignments();
-
-    alert("Safety topic assigned to project.");
-  }
-
-  async function linkWorkerToProject() {
-    if (!isAdmin) {
-      alert("You do not have access to link workers to projects.");
-      return;
-    }
-
-    if (!linkWorkerId) {
-      alert("Choose a worker.");
-      return;
-    }
-
-    if (!linkProjectId) {
-      alert("Choose a project.");
-      return;
-    }
-
-    const { data: existingLink } = await supabase
-      .from("worker_projects")
-      .select("*")
-      .eq("worker_id", linkWorkerId)
-      .eq("project_id", linkProjectId)
-      .maybeSingle();
-
-    if (existingLink) {
-      alert("This worker is already assigned to that project.");
-      return;
-    }
-
-    const { error } = await supabase.from("worker_projects").insert({
-      worker_id: linkWorkerId,
-      project_id: linkProjectId,
-    });
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setLinkWorkerId("");
-    setLinkProjectId("");
-
-    if (linkProjectId === selectedProjectId) {
-      await loadLatestAssignmentForProject(selectedProjectId, worker);
-    }
-
-    alert("Worker linked to project.");
-  }
-
-  function handleProjectChange(event) {
-    const newProjectId = event.target.value;
-    setSelectedProjectId(newProjectId);
-    loadLatestAssignmentForProject(newProjectId, worker);
-  }
-
-  function handleViewChange(nextView) {
-    if ((nextView === "dashboard" || nextView === "admin") && !isAdmin) {
-      setView("worker");
-      alert("You do not have access to that section.");
-      return;
-    }
-
-    setView(nextView);
-  }
-
   useEffect(() => {
     async function checkUser() {
       const { data } = await supabase.auth.getUser();
@@ -1441,6 +1483,7 @@ await loadAllAssignments();
       await loadAllProjects();
       await loadAllWorkers();
       await loadAllTopics();
+      await loadAllAssignments();
 
       if (projectList.length > 0) {
         const firstProjectId = projectList[0].id;
@@ -2435,11 +2478,12 @@ await loadAllAssignments();
               </div>
             )}
 
-                       {adminTab === "assignments" && (
+            {adminTab === "assignments" && (
               <div style={styles.card}>
                 <h3>Manage Assignments</h3>
                 <p>
-                  Assign safety topics to projects and review previous assignments.
+                  Assign safety topics to projects and review previous
+                  assignments.
                 </p>
 
                 <div style={styles.card}>
@@ -2523,13 +2567,11 @@ await loadAllAssignments();
                               </td>
 
                               <td style={styles.td}>
-                                {assignmentItem.projects?.project_name ||
-                                  "No project"}
+                                {assignmentItem.project_name || "No project"}
                               </td>
 
                               <td style={styles.td}>
-                                {assignmentItem.safety_topics?.title ||
-                                  "No topic"}
+                                {assignmentItem.topic_title || "No topic"}
                               </td>
                             </tr>
                           ))}
@@ -2541,7 +2583,7 @@ await loadAllAssignments();
                   )}
                 </div>
               </div>
-            )} 
+            )}
           </div>
         )}
       </div>
