@@ -563,24 +563,16 @@ export default function Home() {
     return data || [];
   }
 
-  async function loadAllAssignments() {
-    const { data: assignmentData, error: assignmentError } = await supabase
-      .from("daily_assignments")
-      .select("id, assigned_date, project_id, topic_id")
-      .order("assigned_date", { ascending: false });
-
-    if (assignmentError) {
-      console.log(assignmentError);
-      setAllAssignments([]);
-      return [];
-    }
-
+    async function loadAllAssignments() {
     const { data: projectData, error: projectError } = await supabase
       .from("projects")
-      .select("id, project_name");
+      .select("id, project_name")
+      .order("project_name", { ascending: true });
 
     if (projectError) {
       console.log(projectError);
+      setAllAssignments([]);
+      return [];
     }
 
     const { data: topicData, error: topicError } = await supabase
@@ -591,26 +583,46 @@ export default function Home() {
       console.log(topicError);
     }
 
-    const assignmentsWithNames = (assignmentData || []).map(
-      (assignmentItem) => {
-        const matchingProject = (projectData || []).find(
-          (projectItem) => projectItem.id === assignmentItem.project_id
-        );
+    let combinedAssignments = [];
 
-        const matchingTopic = (topicData || []).find(
-          (topicItem) => topicItem.id === assignmentItem.topic_id
-        );
+    for (const projectItem of projectData || []) {
+      const { data: assignmentData, error: assignmentError } = await supabase
+        .from("daily_assignments")
+        .select("id, assigned_date, project_id, topic_id")
+        .eq("project_id", projectItem.id)
+        .order("assigned_date", { ascending: false });
 
-        return {
-          ...assignmentItem,
-          project_name: matchingProject?.project_name || "No project",
-          topic_title: matchingTopic?.title || "No topic",
-        };
+      if (assignmentError) {
+        console.log(assignmentError);
+        continue;
       }
+
+      const assignmentsForProject = (assignmentData || []).map(
+        (assignmentItem) => {
+          const matchingTopic = (topicData || []).find(
+            (topicItem) => topicItem.id === assignmentItem.topic_id
+          );
+
+          return {
+            ...assignmentItem,
+            project_name: projectItem.project_name,
+            topic_title: matchingTopic?.title || "No topic",
+          };
+        }
+      );
+
+      combinedAssignments = [
+        ...combinedAssignments,
+        ...assignmentsForProject,
+      ];
+    }
+
+    combinedAssignments.sort((a, b) =>
+      String(b.assigned_date).localeCompare(String(a.assigned_date))
     );
 
-    setAllAssignments(assignmentsWithNames);
-    return assignmentsWithNames;
+    setAllAssignments(combinedAssignments);
+    return combinedAssignments;
   }
 
   async function refreshAdminLists() {
