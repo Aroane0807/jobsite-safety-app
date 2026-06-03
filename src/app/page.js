@@ -89,9 +89,9 @@ export default function Home() {
       : topic?.english_content || "No English content available.";
 
   const acknowledgmentText =
-  language === "spanish"
-    ? "Al marcar esta casilla, confirmo que se me ha proporcionado esta información de seguridad, que he tenido la oportunidad de revisar el documento adjunto, que entiendo los requisitos de seguridad y que acepto seguir estos procedimientos mientras trabajo en este sitio de trabajo. Entiendo que no seguir estos procedimientos de seguridad puede resultar en que sea retirado de la tarea o del sitio de trabajo."
-    : "By checking this box, I confirm that I have been provided this safety information, have had the opportunity to review the attached document, understand the safety requirements, and agree to follow these procedures while working on this jobsite. I understand that failure to follow these safety procedures may result in removal from the task or jobsite.";
+    language === "spanish"
+      ? "Al marcar esta casilla, confirmo que se me ha proporcionado esta información de seguridad, que he tenido la oportunidad de revisar el documento adjunto, que entiendo los requisitos de seguridad y que acepto seguir estos procedimientos mientras trabajo en este sitio de trabajo. Entiendo que no seguir estos procedimientos de seguridad puede resultar en que sea retirado de la tarea o del sitio de trabajo."
+      : "By checking this box, I confirm that I have been provided this safety information, have had the opportunity to review the attached document, understand the safety requirements, and agree to follow these procedures while working on this jobsite. I understand that failure to follow these safety procedures may result in removal from the task or jobsite.";
 
   const acknowledgeButtonText =
     language === "spanish"
@@ -99,8 +99,8 @@ export default function Home() {
         ? "Ya Reconocido"
         : "Reconocer Tema de Seguridad"
       : alreadyAcknowledged
-      ? "Already Acknowledged"
-      : "Acknowledge Safety Topic";
+        ? "Already Acknowledged"
+        : "Acknowledge Safety Topic";
 
   const alreadyAcknowledgedMessage =
     language === "spanish"
@@ -1017,66 +1017,66 @@ export default function Home() {
   }
 
   async function createWorker() {
-  if (!isAdmin) {
-    alert("You do not have access to create workers.");
-    return;
+    if (!isAdmin) {
+      alert("You do not have access to create workers.");
+      return;
+    }
+
+    if (!newWorkerName.trim()) {
+      alert("Enter worker name.");
+      return;
+    }
+
+    if (!newWorkerEmail.trim()) {
+      alert("Enter worker email.");
+      return;
+    }
+
+    if (!newWorkerPhone.trim()) {
+      alert("Enter worker phone number. This will be used as their password.");
+      return;
+    }
+
+    const cleanedPhone = newWorkerPhone.replace(/\D/g, "");
+
+    if (!cleanedPhone) {
+      alert("Enter a valid phone number using digits.");
+      return;
+    }
+
+    const response = await fetch("/api/create-worker", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        fullName: newWorkerName,
+        email: newWorkerEmail,
+        phone: cleanedPhone,
+        preferredLanguage: newWorkerLanguage,
+        role: newWorkerRole,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      alert(result.error || "Could not create worker.");
+      return;
+    }
+
+    setNewWorkerName("");
+    setNewWorkerEmail("");
+    setNewWorkerPhone("");
+    setNewWorkerLanguage("english");
+    setNewWorkerRole("worker");
+
+    await refreshAdminLists();
+
+    alert(
+      "Worker created. They can log in with their email and phone number as the password."
+    );
   }
-
-  if (!newWorkerName.trim()) {
-    alert("Enter worker name.");
-    return;
-  }
-
-  if (!newWorkerEmail.trim()) {
-    alert("Enter worker email.");
-    return;
-  }
-
-  if (!newWorkerPhone.trim()) {
-    alert("Enter worker phone number. This will be used as their password.");
-    return;
-  }
-
-  const cleanedPhone = newWorkerPhone.replace(/\D/g, "");
-
-  if (!cleanedPhone) {
-    alert("Enter a valid phone number using digits.");
-    return;
-  }
-
-  const response = await fetch("/api/create-worker", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      fullName: newWorkerName,
-      email: newWorkerEmail,
-      phone: cleanedPhone,
-      preferredLanguage: newWorkerLanguage,
-      role: newWorkerRole,
-    }),
-  });
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    alert(result.error || "Could not create worker.");
-    return;
-  }
-
-  setNewWorkerName("");
-  setNewWorkerEmail("");
-  setNewWorkerPhone("");
-  setNewWorkerLanguage("english");
-  setNewWorkerRole("worker");
-
-  await refreshAdminLists();
-
-  alert(
-    "Worker created. They can log in with their email and phone number as the password."
-  );
-}
 
   function updateWorkerField(workerId, fieldName, value) {
     setAllWorkers((currentWorkers) =>
@@ -1303,70 +1303,70 @@ export default function Home() {
   }
 
   async function createAssignment() {
-  if (!isAdmin) {
-    alert("You do not have access to create assignments.");
-    return;
+    if (!isAdmin) {
+      alert("You do not have access to create assignments.");
+      return;
+    }
+
+    if (!assignmentProjectId) {
+      alert("Choose a project.");
+      return;
+    }
+
+    if (!assignmentTopicId) {
+      alert("Choose a safety topic.");
+      return;
+    }
+
+    if (!assignmentDate) {
+      alert("Choose an assignment date.");
+      return;
+    }
+
+    const { data: existingAssignment, error: duplicateCheckError } =
+      await supabase
+        .from("daily_assignments")
+        .select("id")
+        .eq("project_id", assignmentProjectId)
+        .eq("topic_id", assignmentTopicId)
+        .eq("assigned_date", assignmentDate)
+        .maybeSingle();
+
+    if (duplicateCheckError) {
+      alert(duplicateCheckError.message);
+      return;
+    }
+
+    if (existingAssignment) {
+      alert(
+        "This safety topic is already assigned to this project for that date."
+      );
+      return;
+    }
+
+    const { error } = await supabase.from("daily_assignments").insert({
+      project_id: assignmentProjectId,
+      topic_id: assignmentTopicId,
+      assigned_date: assignmentDate,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setAssignmentProjectId("");
+    setAssignmentTopicId("");
+    setAssignmentDate("");
+
+    if (assignmentProjectId === selectedProjectId) {
+      await loadLatestAssignmentForProject(selectedProjectId, worker);
+    }
+
+    await loadAllAssignments();
+
+    alert("Safety topic assigned to project.");
   }
-
-  if (!assignmentProjectId) {
-    alert("Choose a project.");
-    return;
-  }
-
-  if (!assignmentTopicId) {
-    alert("Choose a safety topic.");
-    return;
-  }
-
-  if (!assignmentDate) {
-    alert("Choose an assignment date.");
-    return;
-  }
-
-  const { data: existingAssignment, error: duplicateCheckError } =
-    await supabase
-      .from("daily_assignments")
-      .select("id")
-      .eq("project_id", assignmentProjectId)
-      .eq("topic_id", assignmentTopicId)
-      .eq("assigned_date", assignmentDate)
-      .maybeSingle();
-
-  if (duplicateCheckError) {
-    alert(duplicateCheckError.message);
-    return;
-  }
-
-  if (existingAssignment) {
-    alert(
-      "This safety topic is already assigned to this project for that date."
-    );
-    return;
-  }
-
-  const { error } = await supabase.from("daily_assignments").insert({
-    project_id: assignmentProjectId,
-    topic_id: assignmentTopicId,
-    assigned_date: assignmentDate,
-  });
-
-  if (error) {
-    alert(error.message);
-    return;
-  }
-
-  setAssignmentProjectId("");
-  setAssignmentTopicId("");
-  setAssignmentDate("");
-
-  if (assignmentProjectId === selectedProjectId) {
-    await loadLatestAssignmentForProject(selectedProjectId, worker);
-  }
-
-  await loadAllAssignments();
-
-  alert("Safety topic assigned to project.");
-}
 
   function handleProjectChange(event) {
     const newProjectId = event.target.value;
@@ -1410,10 +1410,10 @@ export default function Home() {
               ${isSigned ? "Signed" : "Pending"}
             </td>
             <td>${escapeHtml(
-              formatDateTime(
-                workerAck?.acknowledged_at || workerAck?.Acknowledged_at
-              )
-            )}</td>
+          formatDateTime(
+            workerAck?.acknowledged_at || workerAck?.Acknowledged_at
+          )
+        )}</td>
           </tr>
         `;
       })
@@ -1543,8 +1543,8 @@ export default function Home() {
           <p><strong>Project:</strong> ${escapeHtml(project.project_name)}</p>
           <p><strong>Safety Topic:</strong> ${escapeHtml(topic.title)}</p>
           <p><strong>Assigned Date:</strong> ${escapeHtml(
-            assignment.assigned_date
-          )}</p>
+      assignment.assigned_date
+    )}</p>
           ${documentSection}
 
           <h2>Summary</h2>
@@ -1972,7 +1972,7 @@ export default function Home() {
                               <td style={styles.td}>
                                 {formatDateTime(
                                   workerAck?.acknowledged_at ||
-                                    workerAck?.Acknowledged_at
+                                  workerAck?.Acknowledged_at
                                 )}
                               </td>
                             </tr>
@@ -2133,7 +2133,9 @@ export default function Home() {
 
                 <div style={styles.card}>
                   <h4 style={{ marginTop: 0 }}>Add New Worker</h4>
-
+                  <p style={{ marginTop: 0, color: "#4b5563" }}>
+                    Worker login password will be their phone number using digits only.
+                  </p>
                   <div style={styles.inlineGrid}>
                     <label>
                       Full Name
