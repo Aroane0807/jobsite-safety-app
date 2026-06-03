@@ -563,7 +563,7 @@ export default function Home() {
     return data || [];
   }
 
-    async function loadAllAssignments() {
+  async function loadAllAssignments() {
     const { data: projectData, error: projectError } = await supabase
       .from("projects")
       .select("id, project_name")
@@ -775,6 +775,81 @@ export default function Home() {
         setMessage("");
       }
     }
+  }
+
+  async function loadSpecificAssignment(assignmentId, projectId, currentWorker) {
+    if (!assignmentId || !projectId) {
+      alert("Assignment not found.");
+      return;
+    }
+
+    setChecked(false);
+    setAlreadyAcknowledged(false);
+    setMessage("");
+    setSelectedProjectId(projectId);
+
+    await loadProject(projectId);
+    await loadProjectWorkers(projectId);
+
+    const { data, error } = await supabase
+      .from("daily_assignments")
+      .select("id, assigned_date, project_id, safety_topics(*)")
+      .eq("id", assignmentId)
+      .maybeSingle();
+
+    if (error) {
+      console.log(error);
+      alert(error.message);
+      return;
+    }
+
+    if (!data) {
+      alert("Assignment not found.");
+      return;
+    }
+
+    setAssignment(data);
+    setTopic(data.safety_topics);
+
+    const { data: ackData, error: ackError } = await supabase
+      .from("acknowledgements")
+      .select("*")
+      .eq("assignment_id", data.id)
+      .order("acknowledged_at", { ascending: false });
+
+    if (ackError) {
+      console.log(ackError);
+      setAcknowledgements([]);
+    } else {
+      setAcknowledgements(ackData || []);
+    }
+
+    if (currentWorker) {
+      const { data: existingAck } = await supabase
+        .from("acknowledgements")
+        .select("*")
+        .eq("assignment_id", data.id)
+        .eq("worker_id", currentWorker.id)
+        .maybeSingle();
+
+      if (existingAck) {
+        setAlreadyAcknowledged(true);
+        setMessage(alreadyAcknowledgedMessage);
+      } else {
+        setAlreadyAcknowledged(false);
+        setMessage("");
+      }
+    }
+
+    setView("dashboard");
+  }
+
+  async function viewAssignmentDashboard(assignmentItem) {
+    await loadSpecificAssignment(
+      assignmentItem.id,
+      assignmentItem.project_id,
+      worker
+    );
   }
 
   async function workerIsAssignedToProject(currentWorker, projectId) {
@@ -2568,6 +2643,7 @@ export default function Home() {
                             <th style={styles.th}>Assigned Date</th>
                             <th style={styles.th}>Project</th>
                             <th style={styles.th}>Safety Topic</th>
+                            <th style={styles.th}>Action</th>
                           </tr>
                         </thead>
 
@@ -2584,6 +2660,17 @@ export default function Home() {
 
                               <td style={styles.td}>
                                 {assignmentItem.topic_title || "No topic"}
+                              </td>
+
+                              <td style={styles.td}>
+                                <button
+                                  onClick={() =>
+                                    viewAssignmentDashboard(assignmentItem)
+                                  }
+                                  style={styles.saveButton}
+                                >
+                                  View Dashboard
+                                </button>
                               </td>
                             </tr>
                           ))}
