@@ -1049,119 +1049,526 @@ export default function Home() {
       return;
     }
 
-    const response = await fetch("/api/create-worker", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        fullName: newWorkerName,
-        email: newWorkerEmail,
-        phone: cleanedPhone,
-        preferredLanguage: newWorkerLanguage,
-        role: newWorkerRole,
-      }),
+   const response = await fetch("/api/create-worker", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+  },
+  body: JSON.stringify({
+    fullName: newWorkerName,
+    email: newWorkerEmail,
+    phone: cleanedPhone,
+    preferredLanguage: newWorkerLanguage,
+    role: newWorkerRole,
+  }),
+}); 
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    alert(result.error || "Could not create worker.");
+    return;
+  }
+
+  setNewWorkerName("");
+  setNewWorkerEmail("");
+  setNewWorkerPhone("");
+  setNewWorkerLanguage("english");
+  setNewWorkerRole("worker");
+
+  await refreshAdminLists();
+
+  alert(
+    "Worker created. They can log in with their email and phone number as the password."
+  );
+}
+
+function updateWorkerField(workerId, fieldName, value) {
+  setAllWorkers((currentWorkers) =>
+    currentWorkers.map((workerItem) =>
+      workerItem.id === workerId
+        ? { ...workerItem, [fieldName]: value }
+        : workerItem
+    )
+  );
+}
+
+async function updateWorker(workerItem) {
+  if (!isAdmin) {
+    alert("You do not have access to update workers.");
+    return;
+  }
+
+  if (!workerItem.full_name?.trim()) {
+    alert("Worker name cannot be blank.");
+    return;
+  }
+
+  const { error } = await supabase
+    .from("workers")
+    .update({
+      full_name: workerItem.full_name.trim(),
+      phone: workerItem.phone?.trim() || null,
+      preferred_language: workerItem.preferred_language || "english",
+      role: workerItem.role || "worker",
+    })
+    .eq("id", workerItem.id);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  if (worker?.id === workerItem.id) {
+    setWorker({
+      ...worker,
+      full_name: workerItem.full_name.trim(),
+      phone: workerItem.phone?.trim() || null,
+      preferred_language: workerItem.preferred_language || "english",
+      role: workerItem.role || "worker",
     });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      alert(result.error || "Could not create worker.");
-      return;
-    }
-
-    setNewWorkerName("");
-    setNewWorkerEmail("");
-    setNewWorkerPhone("");
-    setNewWorkerLanguage("english");
-    setNewWorkerRole("worker");
-
-    await refreshAdminLists();
-
-    alert(
-      "Worker created. They can log in with their email and phone number as the password."
-    );
   }
 
-  function updateWorkerField(workerId, fieldName, value) {
-    setAllWorkers((currentWorkers) =>
-      currentWorkers.map((workerItem) =>
-        workerItem.id === workerId
-          ? { ...workerItem, [fieldName]: value }
-          : workerItem
-      )
-    );
+  await loadAllWorkers();
+
+  if (selectedProjectId) {
+    await loadProjectWorkers(selectedProjectId);
   }
 
-  async function updateWorker(workerItem) {
-    if (!isAdmin) {
-      alert("You do not have access to update workers.");
-      return;
-    }
+  alert("Worker updated.");
+}
+async function loadManagedProjectWorkers(projectId) {
+  if (!projectId) {
+    setManagedProjectWorkers([]);
+    return [];
+  }
 
-    if (!workerItem.full_name?.trim()) {
-      alert("Worker name cannot be blank.");
-      return;
-    }
+  const { data: projectWorkerData, error: projectWorkerError } =
+    await supabase
+      .from("worker_projects")
+      .select("id, worker_id, project_id")
+      .eq("project_id", projectId);
 
-    const { error } = await supabase
-      .from("workers")
-      .update({
-        full_name: workerItem.full_name.trim(),
-        phone: workerItem.phone?.trim() || null,
-        preferred_language: workerItem.preferred_language || "english",
-        role: workerItem.role || "worker",
-      })
-      .eq("id", workerItem.id);
+  if (projectWorkerError) {
+    console.log(projectWorkerError);
+    setManagedProjectWorkers([]);
+    return [];
+  }
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
+  const workerIds = (projectWorkerData || []).map((row) => row.worker_id);
 
-    if (worker?.id === workerItem.id) {
-      setWorker({
-        ...worker,
-        full_name: workerItem.full_name.trim(),
-        phone: workerItem.phone?.trim() || null,
-        preferred_language: workerItem.preferred_language || "english",
-        role: workerItem.role || "worker",
+  if (workerIds.length === 0) {
+    setManagedProjectWorkers([]);
+    return [];
+  }
+
+  const { data: workerData, error: workerError } = await supabase
+    .from("workers")
+    .select("*")
+    .in("id", workerIds)
+    .order("full_name", { ascending: true });
+
+  if (workerError) {
+    console.log(workerError);
+    setManagedProjectWorkers([]);
+    return [];
+  }
+
+  const workersWithLinks = (workerData || []).map((workerItem) => {
+    const linkRow = (projectWorkerData || []).find(
+      (row) => row.worker_id === workerItem.id
+    );
+
+    return {
+      ...workerItem,
+      worker_project_link_id: linkRow?.id,
+    };
+  });
+
+  setManagedProjectWorkers(workersWithLinks);
+  return workersWithLinks;
+}
+
+async function removeWorkerFromProject(workerProjectLinkId) {
+  if (!isAdmin) {
+    alert("You do not have access to remove workers from projects.");
+    return;
+  }
+
+  if (!workerProjectLinkId) {
+    alert("Project worker link not found.");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    "Remove this worker from the selected project?"
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("worker_projects")
+    .delete()
+    .eq("id", workerProjectLinkId);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  await loadManagedProjectWorkers(manageProjectWorkersId);
+
+  if (manageProjectWorkersId === selectedProjectId) {
+    await loadProjectWorkers(selectedProjectId);
+  }
+
+  alert("Worker removed from project.");
+}
+
+function handleManageProjectWorkersChange(projectId) {
+  setManageProjectWorkersId(projectId);
+  loadManagedProjectWorkers(projectId);
+}
+async function linkWorkerToProject() {
+  if (!isAdmin) {
+    alert("You do not have access to link workers to projects.");
+    return;
+  }
+
+  if (!linkWorkerId) {
+    alert("Choose a worker.");
+    return;
+  }
+
+  if (!linkProjectId) {
+    alert("Choose a project.");
+    return;
+  }
+
+  const { data: existingLink } = await supabase
+    .from("worker_projects")
+    .select("*")
+    .eq("worker_id", linkWorkerId)
+    .eq("project_id", linkProjectId)
+    .maybeSingle();
+
+  if (existingLink) {
+    alert("This worker is already assigned to that project.");
+    return;
+  }
+
+  const { error } = await supabase.from("worker_projects").insert({
+    worker_id: linkWorkerId,
+    project_id: linkProjectId,
+  });
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  setLinkWorkerId("");
+  setLinkProjectId("");
+
+  if (linkProjectId === selectedProjectId) {
+    await loadLatestAssignmentForProject(selectedProjectId, worker);
+  }
+
+  if (linkProjectId === manageProjectWorkersId) {
+    await loadManagedProjectWorkers(manageProjectWorkersId);
+  }
+
+  alert("Worker linked to project.");
+}
+
+async function createSafetyTopic() {
+  if (!isAdmin) {
+    alert("You do not have access to create safety topics.");
+    return;
+  }
+
+  if (!newTopicTitle.trim()) {
+    alert("Enter a safety topic title.");
+    return;
+  }
+
+  setUploadingDocument(true);
+
+  let finalDocumentName = newTopicDocumentName.trim() || null;
+  let finalDocumentUrl = newTopicDocumentUrl.trim() || null;
+
+  if (newTopicFile) {
+    const safeFileName = newTopicFile.name
+      .replace(/[^a-zA-Z0-9._-]/g, "-")
+      .toLowerCase();
+
+    const filePath = `${Date.now()}-${safeFileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("safety-documents")
+      .upload(filePath, newTopicFile, {
+        cacheControl: "3600",
+        upsert: false,
       });
+
+    if (uploadError) {
+      setUploadingDocument(false);
+      alert(uploadError.message);
+      return;
     }
 
-    await loadAllWorkers();
+    const { data: publicUrlData } = supabase.storage
+      .from("safety-documents")
+      .getPublicUrl(filePath);
 
-    if (selectedProjectId) {
-      await loadProjectWorkers(selectedProjectId);
+    finalDocumentUrl = publicUrlData.publicUrl;
+
+    if (!finalDocumentName) {
+      finalDocumentName = newTopicFile.name;
     }
-
-    alert("Worker updated.");
   }
-  async function loadManagedProjectWorkers(projectId) {
-    if (!projectId) {
-      setManagedProjectWorkers([]);
-      return [];
-    }
 
-    const { data: projectWorkerData, error: projectWorkerError } =
-      await supabase
-        .from("worker_projects")
-        .select("id, worker_id, project_id")
-        .eq("project_id", projectId);
+  const { error } = await supabase.from("safety_topics").insert({
+    title: newTopicTitle.trim(),
+    english_content: newTopicEnglish.trim(),
+    spanish_content: newTopicSpanish.trim(),
+    document_name: finalDocumentName,
+    document_url: finalDocumentUrl,
+  });
 
-    if (projectWorkerError) {
-      console.log(projectWorkerError);
-      setManagedProjectWorkers([]);
-      return [];
-    }
+  setUploadingDocument(false);
 
-    const workerIds = (projectWorkerData || []).map((row) => row.worker_id);
+  if (error) {
+    alert(error.message);
+    return;
+  }
 
-    if (workerIds.length === 0) {
-      setManagedProjectWorkers([]);
-      return [];
-    }
+  setNewTopicTitle("");
+  setNewTopicEnglish("");
+  setNewTopicSpanish("");
+  setNewTopicDocumentName("");
+  setNewTopicDocumentUrl("");
+  setNewTopicFile(null);
+  setFileInputKey(Date.now());
+  setShowAddTopicForm(false);
 
+  await refreshAdminLists();
+  alert("Safety topic created.");
+}
+
+function updateTopicField(topicId, fieldName, value) {
+  setAllTopics((currentTopics) =>
+    currentTopics.map((topicItem) =>
+      topicItem.id === topicId
+        ? { ...topicItem, [fieldName]: value }
+        : topicItem
+    )
+  );
+}
+
+async function updateSafetyTopic(topicItem) {
+  if (!isAdmin) {
+    alert("You do not have access to update safety topics.");
+    return;
+  }
+
+  if (!topicItem.title?.trim()) {
+    alert("Safety topic title cannot be blank.");
+    return;
+  }
+
+  const { error } = await supabase
+    .from("safety_topics")
+    .update({
+      title: topicItem.title.trim(),
+      english_content: topicItem.english_content || "",
+      spanish_content: topicItem.spanish_content || "",
+      document_name: topicItem.document_name?.trim() || null,
+      document_url: topicItem.document_url?.trim() || null,
+    })
+    .eq("id", topicItem.id);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  await loadAllTopics();
+
+  if (topic?.id === topicItem.id) {
+    await loadLatestAssignmentForProject(selectedProjectId, worker);
+  }
+
+  alert("Safety topic updated.");
+}
+
+async function createAssignment() {
+  if (!isAdmin) {
+    alert("You do not have access to create assignments.");
+    return;
+  }
+
+  if (!assignmentProjectId) {
+    alert("Choose a project.");
+    return;
+  }
+
+  if (!assignmentTopicId) {
+    alert("Choose a safety topic.");
+    return;
+  }
+
+  if (!assignmentDate) {
+    alert("Choose an assignment date.");
+    return;
+  }
+
+  const { data: existingAssignment, error: duplicateCheckError } =
+    await supabase
+      .from("daily_assignments")
+      .select("id")
+      .eq("project_id", assignmentProjectId)
+      .eq("topic_id", assignmentTopicId)
+      .eq("assigned_date", assignmentDate)
+      .maybeSingle();
+
+  if (duplicateCheckError) {
+    alert(duplicateCheckError.message);
+    return;
+  }
+
+  if (existingAssignment) {
+    alert(
+      "This safety topic is already assigned to this project for that date."
+    );
+    return;
+  }
+
+  const { error } = await supabase.from("daily_assignments").insert({
+    project_id: assignmentProjectId,
+    topic_id: assignmentTopicId,
+    assigned_date: assignmentDate,
+  });
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  setAssignmentProjectId("");
+  setAssignmentTopicId("");
+  setAssignmentDate("");
+
+  if (assignmentProjectId === selectedProjectId) {
+    await loadLatestAssignmentForProject(selectedProjectId, worker);
+  }
+
+  await loadAllAssignments();
+
+  alert("Safety topic assigned to project.");
+}
+
+function handleProjectChange(event) {
+  const newProjectId = event.target.value;
+  setSelectedProjectId(newProjectId);
+  loadLatestAssignmentForProject(newProjectId, worker);
+}
+
+function handleViewChange(nextView) {
+  if ((nextView === "dashboard" || nextView === "admin") && !isAdmin) {
+    setView("worker");
+    alert("You do not have access to that section.");
+    return;
+  }
+
+  setView(nextView);
+}
+
+async function generateWeeklyReport() {
+  if (!weeklyReportProjectId) {
+    alert("Choose a project for the weekly report.");
+    return;
+  }
+
+  if (!weeklyReportStartDate) {
+    alert("Choose a start date for the weekly report.");
+    return;
+  }
+
+  if (!weeklyReportEndDate) {
+    alert("Choose an end date for the weekly report.");
+    return;
+  }
+
+  if (weeklyReportStartDate > weeklyReportEndDate) {
+    alert("Start date cannot be after end date.");
+    return;
+  }
+
+  const selectedProject = allProjects.find(
+    (projectItem) => projectItem.id === weeklyReportProjectId
+  );
+
+  const { data: assignmentData, error: assignmentError } = await supabase
+    .from("daily_assignments")
+    .select("id, assigned_date, project_id, topic_id")
+    .eq("project_id", weeklyReportProjectId)
+    .gte("assigned_date", weeklyReportStartDate)
+    .lte("assigned_date", weeklyReportEndDate)
+    .order("assigned_date", { ascending: true });
+
+  if (assignmentError) {
+    alert(assignmentError.message);
+    return;
+  }
+
+  if (!assignmentData || assignmentData.length === 0) {
+    alert("No assignments found for that project and date range.");
+    return;
+  }
+
+  const topicIds = [...new Set(assignmentData.map((item) => item.topic_id))];
+
+  const { data: topicData, error: topicError } = await supabase
+    .from("safety_topics")
+    .select("id, title, document_name, document_url")
+    .in("id", topicIds);
+
+  if (topicError) {
+    alert(topicError.message);
+    return;
+  }
+
+  const assignmentIds = assignmentData.map((item) => item.id);
+
+  const { data: ackData, error: ackError } = await supabase
+    .from("acknowledgements")
+    .select("*")
+    .in("assignment_id", assignmentIds);
+
+  if (ackError) {
+    alert(ackError.message);
+    return;
+  }
+
+  const { data: projectWorkerData, error: projectWorkerError } = await supabase
+    .from("worker_projects")
+    .select("worker_id")
+    .eq("project_id", weeklyReportProjectId);
+
+  if (projectWorkerError) {
+    alert(projectWorkerError.message);
+    return;
+  }
+
+  const workerIds = (projectWorkerData || []).map((row) => row.worker_id);
+
+  let projectWorkers = [];
+
+  if (workerIds.length > 0) {
     const { data: workerData, error: workerError } = await supabase
       .from("workers")
       .select("*")
@@ -1169,450 +1576,44 @@ export default function Home() {
       .order("full_name", { ascending: true });
 
     if (workerError) {
-      console.log(workerError);
-      setManagedProjectWorkers([]);
-      return [];
+      alert(workerError.message);
+      return;
     }
 
-    const workersWithLinks = (workerData || []).map((workerItem) => {
-      const linkRow = (projectWorkerData || []).find(
-        (row) => row.worker_id === workerItem.id
-      );
-
-      return {
-        ...workerItem,
-        worker_project_link_id: linkRow?.id,
-      };
-    });
-
-    setManagedProjectWorkers(workersWithLinks);
-    return workersWithLinks;
+    projectWorkers = workerData || [];
   }
 
-  async function removeWorkerFromProject(workerProjectLinkId) {
-    if (!isAdmin) {
-      alert("You do not have access to remove workers from projects.");
-      return;
-    }
+  const reportWindow = window.open("", "_blank");
 
-    if (!workerProjectLinkId) {
-      alert("Project worker link not found.");
-      return;
-    }
-
-    const confirmed = window.confirm(
-      "Remove this worker from the selected project?"
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    const { error } = await supabase
-      .from("worker_projects")
-      .delete()
-      .eq("id", workerProjectLinkId);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    await loadManagedProjectWorkers(manageProjectWorkersId);
-
-    if (manageProjectWorkersId === selectedProjectId) {
-      await loadProjectWorkers(selectedProjectId);
-    }
-
-    alert("Worker removed from project.");
+  if (!reportWindow) {
+    alert("Popup blocked. Please allow popups for this site and try again.");
+    return;
   }
 
-  function handleManageProjectWorkersChange(projectId) {
-    setManageProjectWorkersId(projectId);
-    loadManagedProjectWorkers(projectId);
-  }
-  async function linkWorkerToProject() {
-    if (!isAdmin) {
-      alert("You do not have access to link workers to projects.");
-      return;
-    }
-
-    if (!linkWorkerId) {
-      alert("Choose a worker.");
-      return;
-    }
-
-    if (!linkProjectId) {
-      alert("Choose a project.");
-      return;
-    }
-
-    const { data: existingLink } = await supabase
-      .from("worker_projects")
-      .select("*")
-      .eq("worker_id", linkWorkerId)
-      .eq("project_id", linkProjectId)
-      .maybeSingle();
-
-    if (existingLink) {
-      alert("This worker is already assigned to that project.");
-      return;
-    }
-
-    const { error } = await supabase.from("worker_projects").insert({
-      worker_id: linkWorkerId,
-      project_id: linkProjectId,
-    });
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setLinkWorkerId("");
-    setLinkProjectId("");
-
-    if (linkProjectId === selectedProjectId) {
-      await loadLatestAssignmentForProject(selectedProjectId, worker);
-    }
-
-    if (linkProjectId === manageProjectWorkersId) {
-      await loadManagedProjectWorkers(manageProjectWorkersId);
-    }
-
-    alert("Worker linked to project.");
-  }
-
-  async function createSafetyTopic() {
-    if (!isAdmin) {
-      alert("You do not have access to create safety topics.");
-      return;
-    }
-
-    if (!newTopicTitle.trim()) {
-      alert("Enter a safety topic title.");
-      return;
-    }
-
-    setUploadingDocument(true);
-
-    let finalDocumentName = newTopicDocumentName.trim() || null;
-    let finalDocumentUrl = newTopicDocumentUrl.trim() || null;
-
-    if (newTopicFile) {
-      const safeFileName = newTopicFile.name
-        .replace(/[^a-zA-Z0-9._-]/g, "-")
-        .toLowerCase();
-
-      const filePath = `${Date.now()}-${safeFileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("safety-documents")
-        .upload(filePath, newTopicFile, {
-          cacheControl: "3600",
-          upsert: false,
-        });
-
-      if (uploadError) {
-        setUploadingDocument(false);
-        alert(uploadError.message);
-        return;
-      }
-
-      const { data: publicUrlData } = supabase.storage
-        .from("safety-documents")
-        .getPublicUrl(filePath);
-
-      finalDocumentUrl = publicUrlData.publicUrl;
-
-      if (!finalDocumentName) {
-        finalDocumentName = newTopicFile.name;
-      }
-    }
-
-    const { error } = await supabase.from("safety_topics").insert({
-      title: newTopicTitle.trim(),
-      english_content: newTopicEnglish.trim(),
-      spanish_content: newTopicSpanish.trim(),
-      document_name: finalDocumentName,
-      document_url: finalDocumentUrl,
-    });
-
-    setUploadingDocument(false);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setNewTopicTitle("");
-    setNewTopicEnglish("");
-    setNewTopicSpanish("");
-    setNewTopicDocumentName("");
-    setNewTopicDocumentUrl("");
-    setNewTopicFile(null);
-    setFileInputKey(Date.now());
-    setShowAddTopicForm(false);
-
-    await refreshAdminLists();
-    alert("Safety topic created.");
-  }
-
-  function updateTopicField(topicId, fieldName, value) {
-    setAllTopics((currentTopics) =>
-      currentTopics.map((topicItem) =>
-        topicItem.id === topicId
-          ? { ...topicItem, [fieldName]: value }
-          : topicItem
-      )
-    );
-  }
-
-  async function updateSafetyTopic(topicItem) {
-    if (!isAdmin) {
-      alert("You do not have access to update safety topics.");
-      return;
-    }
-
-    if (!topicItem.title?.trim()) {
-      alert("Safety topic title cannot be blank.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("safety_topics")
-      .update({
-        title: topicItem.title.trim(),
-        english_content: topicItem.english_content || "",
-        spanish_content: topicItem.spanish_content || "",
-        document_name: topicItem.document_name?.trim() || null,
-        document_url: topicItem.document_url?.trim() || null,
-      })
-      .eq("id", topicItem.id);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    await loadAllTopics();
-
-    if (topic?.id === topicItem.id) {
-      await loadLatestAssignmentForProject(selectedProjectId, worker);
-    }
-
-    alert("Safety topic updated.");
-  }
-
-  async function createAssignment() {
-    if (!isAdmin) {
-      alert("You do not have access to create assignments.");
-      return;
-    }
-
-    if (!assignmentProjectId) {
-      alert("Choose a project.");
-      return;
-    }
-
-    if (!assignmentTopicId) {
-      alert("Choose a safety topic.");
-      return;
-    }
-
-    if (!assignmentDate) {
-      alert("Choose an assignment date.");
-      return;
-    }
-
-    const { data: existingAssignment, error: duplicateCheckError } =
-      await supabase
-        .from("daily_assignments")
-        .select("id")
-        .eq("project_id", assignmentProjectId)
-        .eq("topic_id", assignmentTopicId)
-        .eq("assigned_date", assignmentDate)
-        .maybeSingle();
-
-    if (duplicateCheckError) {
-      alert(duplicateCheckError.message);
-      return;
-    }
-
-    if (existingAssignment) {
-      alert(
-        "This safety topic is already assigned to this project for that date."
-      );
-      return;
-    }
-
-    const { error } = await supabase.from("daily_assignments").insert({
-      project_id: assignmentProjectId,
-      topic_id: assignmentTopicId,
-      assigned_date: assignmentDate,
-    });
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setAssignmentProjectId("");
-    setAssignmentTopicId("");
-    setAssignmentDate("");
-
-    if (assignmentProjectId === selectedProjectId) {
-      await loadLatestAssignmentForProject(selectedProjectId, worker);
-    }
-
-    await loadAllAssignments();
-
-    alert("Safety topic assigned to project.");
-  }
-
-  function handleProjectChange(event) {
-    const newProjectId = event.target.value;
-    setSelectedProjectId(newProjectId);
-    loadLatestAssignmentForProject(newProjectId, worker);
-  }
-
-  function handleViewChange(nextView) {
-    if ((nextView === "dashboard" || nextView === "admin") && !isAdmin) {
-      setView("worker");
-      alert("You do not have access to that section.");
-      return;
-    }
-
-    setView(nextView);
-  }
-
-  async function generateWeeklyReport() {
-    if (!weeklyReportProjectId) {
-      alert("Choose a project for the weekly report.");
-      return;
-    }
-
-    if (!weeklyReportStartDate) {
-      alert("Choose a start date for the weekly report.");
-      return;
-    }
-
-    if (!weeklyReportEndDate) {
-      alert("Choose an end date for the weekly report.");
-      return;
-    }
-
-    if (weeklyReportStartDate > weeklyReportEndDate) {
-      alert("Start date cannot be after end date.");
-      return;
-    }
-
-    const selectedProject = allProjects.find(
-      (projectItem) => projectItem.id === weeklyReportProjectId
-    );
-
-    const { data: assignmentData, error: assignmentError } = await supabase
-      .from("daily_assignments")
-      .select("id, assigned_date, project_id, topic_id")
-      .eq("project_id", weeklyReportProjectId)
-      .gte("assigned_date", weeklyReportStartDate)
-      .lte("assigned_date", weeklyReportEndDate)
-      .order("assigned_date", { ascending: true });
-
-    if (assignmentError) {
-      alert(assignmentError.message);
-      return;
-    }
-
-    if (!assignmentData || assignmentData.length === 0) {
-      alert("No assignments found for that project and date range.");
-      return;
-    }
-
-    const topicIds = [...new Set(assignmentData.map((item) => item.topic_id))];
-
-    const { data: topicData, error: topicError } = await supabase
-      .from("safety_topics")
-      .select("id, title, document_name, document_url")
-      .in("id", topicIds);
-
-    if (topicError) {
-      alert(topicError.message);
-      return;
-    }
-
-    const assignmentIds = assignmentData.map((item) => item.id);
-
-    const { data: ackData, error: ackError } = await supabase
-      .from("acknowledgements")
-      .select("*")
-      .in("assignment_id", assignmentIds);
-
-    if (ackError) {
-      alert(ackError.message);
-      return;
-    }
-
-    const { data: projectWorkerData, error: projectWorkerError } = await supabase
-      .from("worker_projects")
-      .select("worker_id")
-      .eq("project_id", weeklyReportProjectId);
-
-    if (projectWorkerError) {
-      alert(projectWorkerError.message);
-      return;
-    }
-
-    const workerIds = (projectWorkerData || []).map((row) => row.worker_id);
-
-    let projectWorkers = [];
-
-    if (workerIds.length > 0) {
-      const { data: workerData, error: workerError } = await supabase
-        .from("workers")
-        .select("*")
-        .in("id", workerIds)
-        .order("full_name", { ascending: true });
-
-      if (workerError) {
-        alert(workerError.message);
-        return;
-      }
-
-      projectWorkers = workerData || [];
-    }
-
-    const reportWindow = window.open("", "_blank");
-
-    if (!reportWindow) {
-      alert("Popup blocked. Please allow popups for this site and try again.");
-      return;
-    }
-
-    const topicMap = new Map((topicData || []).map((item) => [item.id, item]));
-    const ackList = ackData || [];
-
-    const summaryRows = assignmentData
-      .map((assignmentItem) => {
-        const topicItem = topicMap.get(assignmentItem.topic_id);
-        const signedCountForAssignment = projectWorkers.filter((workerItem) =>
-          ackList.some(
-            (ack) =>
-              ack.assignment_id === assignmentItem.id &&
-              ack.worker_id === workerItem.id
-          )
-        ).length;
-
-        const pendingCountForAssignment =
-          projectWorkers.length - signedCountForAssignment;
-
-        const documentLink = topicItem?.document_url
-          ? `<a href="${escapeHtml(topicItem.document_url)}" target="_blank">${escapeHtml(
-            topicItem.document_name || "Open document"
-          )}</a>`
-          : "No document";
-
-        return `
+  const topicMap = new Map((topicData || []).map((item) => [item.id, item]));
+  const ackList = ackData || [];
+
+  const summaryRows = assignmentData
+    .map((assignmentItem) => {
+      const topicItem = topicMap.get(assignmentItem.topic_id);
+      const signedCountForAssignment = projectWorkers.filter((workerItem) =>
+        ackList.some(
+          (ack) =>
+            ack.assignment_id === assignmentItem.id &&
+            ack.worker_id === workerItem.id
+        )
+      ).length;
+
+      const pendingCountForAssignment =
+        projectWorkers.length - signedCountForAssignment;
+
+      const documentLink = topicItem?.document_url
+        ? `<a href="${escapeHtml(topicItem.document_url)}" target="_blank">${escapeHtml(
+          topicItem.document_name || "Open document"
+        )}</a>`
+        : "No document";
+
+      return `
         <tr>
           <td>${escapeHtml(assignmentItem.assigned_date)}</td>
           <td>${escapeHtml(topicItem?.title || "No topic")}</td>
@@ -1622,24 +1623,24 @@ export default function Home() {
           <td class="pending">${pendingCountForAssignment}</td>
         </tr>
       `;
-      })
-      .join("");
+    })
+    .join("");
 
-    const detailRows = assignmentData
-      .map((assignmentItem) => {
-        const topicItem = topicMap.get(assignmentItem.topic_id);
+  const detailRows = assignmentData
+    .map((assignmentItem) => {
+      const topicItem = topicMap.get(assignmentItem.topic_id);
 
-        return projectWorkers
-          .map((workerItem) => {
-            const workerAck = ackList.find(
-              (ack) =>
-                ack.assignment_id === assignmentItem.id &&
-                ack.worker_id === workerItem.id
-            );
+      return projectWorkers
+        .map((workerItem) => {
+          const workerAck = ackList.find(
+            (ack) =>
+              ack.assignment_id === assignmentItem.id &&
+              ack.worker_id === workerItem.id
+          );
 
-            const isSigned = Boolean(workerAck);
+          const isSigned = Boolean(workerAck);
 
-            return `
+          return `
             <tr>
               <td>${escapeHtml(assignmentItem.assigned_date)}</td>
               <td>${escapeHtml(topicItem?.title || "No topic")}</td>
@@ -1649,20 +1650,20 @@ export default function Home() {
                 ${isSigned ? "Signed" : "Pending"}
               </td>
               <td>${escapeHtml(
-              formatDateTime(
-                workerAck?.acknowledged_at || workerAck?.Acknowledged_at
-              )
-            )}</td>
+            formatDateTime(
+              workerAck?.acknowledged_at || workerAck?.Acknowledged_at
+            )
+          )}</td>
             </tr>
           `;
-          })
-          .join("");
-      })
-      .join("");
+        })
+        .join("");
+    })
+    .join("");
 
-    const generatedAt = new Date().toLocaleString();
+  const generatedAt = new Date().toLocaleString();
 
-    reportWindow.document.write(`
+  reportWindow.document.write(`
     <!DOCTYPE html>
     <html>
       <head>
@@ -1747,11 +1748,11 @@ export default function Home() {
 
         <h2>Report Details</h2>
         <p><strong>Project:</strong> ${escapeHtml(
-      selectedProject?.project_name || "Selected project"
-    )}</p>
+    selectedProject?.project_name || "Selected project"
+  )}</p>
         <p><strong>Date Range:</strong> ${escapeHtml(
-      weeklyReportStartDate
-    )} through ${escapeHtml(weeklyReportEndDate)}</p>
+    weeklyReportStartDate
+  )} through ${escapeHtml(weeklyReportEndDate)}</p>
 
         <h2>Weekly Assignment Summary</h2>
 
@@ -1802,775 +1803,361 @@ export default function Home() {
     </html>
   `);
 
-    reportWindow.document.close();
+  reportWindow.document.close();
+}
+
+useEffect(() => {
+  async function checkUser() {
+    const { data } = await supabase.auth.getUser();
+    setUser(data.user);
   }
 
-  useEffect(() => {
-    async function checkUser() {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
+  checkUser();
+}, []);
+
+useEffect(() => {
+  async function loadInitialData() {
+    const currentWorker = await loadWorker(user);
+    const projectList = await loadProjects();
+    await loadAllProjects();
+    await loadAllWorkers();
+    await loadAllTopics();
+    await loadAllAssignments();
+
+    if (projectList.length > 0) {
+      const firstProjectId = projectList[0].id;
+      setSelectedProjectId(firstProjectId);
+      await loadLatestAssignmentForProject(firstProjectId, currentWorker);
     }
-
-    checkUser();
-  }, []);
-
-  useEffect(() => {
-    async function loadInitialData() {
-      const currentWorker = await loadWorker(user);
-      const projectList = await loadProjects();
-      await loadAllProjects();
-      await loadAllWorkers();
-      await loadAllTopics();
-      await loadAllAssignments();
-
-      if (projectList.length > 0) {
-        const firstProjectId = projectList[0].id;
-        setSelectedProjectId(firstProjectId);
-        await loadLatestAssignmentForProject(firstProjectId, currentWorker);
-      }
-    }
-
-    if (user) {
-      loadInitialData();
-    }
-  }, [user]);
-
-  if (!user) {
-    return (
-      <main style={styles.page}>
-        <div style={{ ...styles.container, maxWidth: 420 }}>
-          <div style={styles.header}>
-            <h1 style={styles.title}>Jobsite Safety</h1>
-            <p style={styles.subtitle}>Daily safety acknowledgment portal</p>
-          </div>
-
-          <div style={styles.card}>
-            <h2>Login</h2>
-
-            <input
-              style={styles.input}
-              placeholder="Email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-
-            <input
-              style={styles.input}
-              placeholder="Password"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-
-            <button onClick={login} style={styles.primaryButton}>
-              Login
-            </button>
-          </div>
-        </div>
-      </main>
-    );
   }
 
+  if (user) {
+    loadInitialData();
+  }
+}, [user]);
+
+if (!user) {
   return (
     <main style={styles.page}>
-      <div style={styles.container}>
+      <div style={{ ...styles.container, maxWidth: 420 }}>
         <div style={styles.header}>
           <h1 style={styles.title}>Jobsite Safety</h1>
-          <p style={styles.subtitle}>
-            Logged in as {user.email}
-            {worker ? ` • ${worker.full_name}` : ""}
-            {worker?.role ? (
-              <span style={styles.roleBadge}>{worker.role}</span>
-            ) : null}
-          </p>
+          <p style={styles.subtitle}>Daily safety acknowledgment portal</p>
         </div>
 
         <div style={styles.card}>
-          <button onClick={logout} style={styles.button}>
-            Logout
+          <h2>Login</h2>
+
+          <input
+            style={styles.input}
+            placeholder="Email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+
+          <input
+            style={styles.input}
+            placeholder="Password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+
+          <button onClick={login} style={styles.primaryButton}>
+            Login
           </button>
+        </div>
+      </div>
+    </main>
+  );
+}
 
-          <div style={{ marginTop: 20 }}>
-            <label>
-              <strong>Select Project</strong>
-              <select
-                value={selectedProjectId}
-                onChange={handleProjectChange}
-                style={styles.select}
-              >
-                {projects.length > 0 ? (
-                  projects.map((projectItem) => (
-                    <option key={projectItem.id} value={projectItem.id}>
-                      {projectItem.project_name}
-                    </option>
-                  ))
-                ) : (
-                  <option value="">No active projects found</option>
-                )}
-              </select>
-            </label>
-          </div>
+return (
+  <main style={styles.page}>
+    <div style={styles.container}>
+      <div style={styles.header}>
+        <h1 style={styles.title}>Jobsite Safety</h1>
+        <p style={styles.subtitle}>
+          Logged in as {user.email}
+          {worker ? ` • ${worker.full_name}` : ""}
+          {worker?.role ? (
+            <span style={styles.roleBadge}>{worker.role}</span>
+          ) : null}
+        </p>
+      </div>
 
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              marginTop: 20,
-              flexWrap: "wrap",
-            }}
-          >
-            <button
-              onClick={() => handleViewChange("worker")}
-              style={{
-                ...styles.tabButton,
-                background: view === "worker" ? "#2563eb" : "#ffffff",
-                color: view === "worker" ? "#ffffff" : "#1f2937",
-                fontWeight: view === "worker" ? "bold" : "normal",
-              }}
+      <div style={styles.card}>
+        <button onClick={logout} style={styles.button}>
+          Logout
+        </button>
+
+        <div style={{ marginTop: 20 }}>
+          <label>
+            <strong>Select Project</strong>
+            <select
+              value={selectedProjectId}
+              onChange={handleProjectChange}
+              style={styles.select}
             >
-              Worker View
-            </button>
-
-            {isAdmin && (
-              <button
-                onClick={() => handleViewChange("dashboard")}
-                style={{
-                  ...styles.tabButton,
-                  background: view === "dashboard" ? "#2563eb" : "#ffffff",
-                  color: view === "dashboard" ? "#ffffff" : "#1f2937",
-                  fontWeight: view === "dashboard" ? "bold" : "normal",
-                }}
-              >
-                Superintendent Dashboard
-              </button>
-            )}
-
-            {isAdmin && (
-              <button
-                onClick={() => handleViewChange("admin")}
-                style={{
-                  ...styles.tabButton,
-                  background: view === "admin" ? "#2563eb" : "#ffffff",
-                  color: view === "admin" ? "#ffffff" : "#1f2937",
-                  fontWeight: view === "admin" ? "bold" : "normal",
-                }}
-              >
-                Admin Tools
-              </button>
-            )}
-          </div>
+              {projects.length > 0 ? (
+                projects.map((projectItem) => (
+                  <option key={projectItem.id} value={projectItem.id}>
+                    {projectItem.project_name}
+                  </option>
+                ))
+              ) : (
+                <option value="">No active projects found</option>
+              )}
+            </select>
+          </label>
         </div>
 
-        {view === "worker" && (
-          <div style={styles.card}>
-            <h2>Today's Safety Topic</h2>
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            marginTop: 20,
+            flexWrap: "wrap",
+          }}
+        >
+          <button
+            onClick={() => handleViewChange("worker")}
+            style={{
+              ...styles.tabButton,
+              background: view === "worker" ? "#2563eb" : "#ffffff",
+              color: view === "worker" ? "#ffffff" : "#1f2937",
+              fontWeight: view === "worker" ? "bold" : "normal",
+            }}
+          >
+            Worker View
+          </button>
 
-            {project && (
-              <p>
-                <strong>Project:</strong> {project.project_name}
-              </p>
-            )}
+          {isAdmin && (
+            <button
+              onClick={() => handleViewChange("dashboard")}
+              style={{
+                ...styles.tabButton,
+                background: view === "dashboard" ? "#2563eb" : "#ffffff",
+                color: view === "dashboard" ? "#ffffff" : "#1f2937",
+                fontWeight: view === "dashboard" ? "bold" : "normal",
+              }}
+            >
+              Superintendent Dashboard
+            </button>
+          )}
 
-            <div style={styles.languageRow}>
-              <button
-                onClick={() => setLanguage("english")}
+          {isAdmin && (
+            <button
+              onClick={() => handleViewChange("admin")}
+              style={{
+                ...styles.tabButton,
+                background: view === "admin" ? "#2563eb" : "#ffffff",
+                color: view === "admin" ? "#ffffff" : "#1f2937",
+                fontWeight: view === "admin" ? "bold" : "normal",
+              }}
+            >
+              Admin Tools
+            </button>
+          )}
+        </div>
+      </div>
+
+      {view === "worker" && (
+        <div style={styles.card}>
+          <h2>Today's Safety Topic</h2>
+
+          {project && (
+            <p>
+              <strong>Project:</strong> {project.project_name}
+            </p>
+          )}
+
+          <div style={styles.languageRow}>
+            <button
+              onClick={() => setLanguage("english")}
+              style={{
+                ...styles.languageButton,
+                background: language === "english" ? "#2563eb" : "#ffffff",
+                color: language === "english" ? "#ffffff" : "#1f2937",
+                fontWeight: language === "english" ? "bold" : "normal",
+              }}
+            >
+              English
+            </button>
+
+            <button
+              onClick={() => setLanguage("spanish")}
+              style={{
+                ...styles.languageButton,
+                background: language === "spanish" ? "#2563eb" : "#ffffff",
+                color: language === "spanish" ? "#ffffff" : "#1f2937",
+                fontWeight: language === "spanish" ? "bold" : "normal",
+              }}
+            >
+              Español
+            </button>
+          </div>
+
+          {topic ? (
+            <>
+              <h3>{topic.title}</h3>
+
+              <p style={styles.topicText}>{topicText}</p>
+
+              {topic.document_url && (
+                <div style={{ marginTop: 16 }}>
+                  <a
+                    href={topic.document_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={styles.documentButton}
+                  >
+                    Open Safety Document
+                    {topic.document_name ? `: ${topic.document_name}` : ""}
+                  </a>
+                </div>
+              )}
+
+              <div
                 style={{
-                  ...styles.languageButton,
-                  background: language === "english" ? "#2563eb" : "#ffffff",
-                  color: language === "english" ? "#ffffff" : "#1f2937",
-                  fontWeight: language === "english" ? "bold" : "normal",
+                  marginTop: 24,
+                  padding: 16,
+                  border: "1px solid #d1d5db",
+                  borderRadius: 10,
+                  background: "#f9fafb",
                 }}
               >
-                English
-              </button>
+                <label style={{ display: "flex", gap: 10, lineHeight: 1.5 }}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={alreadyAcknowledged}
+                    onChange={(event) => setChecked(event.target.checked)}
+                    style={{ marginTop: 4 }}
+                  />
+                  <span>{acknowledgmentText}</span>
+                </label>
+              </div>
 
               <button
-                onClick={() => setLanguage("spanish")}
-                style={{
-                  ...styles.languageButton,
-                  background: language === "spanish" ? "#2563eb" : "#ffffff",
-                  color: language === "spanish" ? "#ffffff" : "#1f2937",
-                  fontWeight: language === "spanish" ? "bold" : "normal",
-                }}
+                onClick={acknowledge}
+                disabled={alreadyAcknowledged}
+                style={
+                  alreadyAcknowledged
+                    ? styles.disabledButton
+                    : styles.primaryButton
+                }
               >
-                Español
+                {acknowledgeButtonText}
               </button>
-            </div>
 
-            {topic ? (
-              <>
-                <h3>{topic.title}</h3>
+              {message && (
+                <p
+                  style={
+                    alreadyAcknowledged || message.includes("successfully")
+                      ? styles.notice
+                      : styles.warning
+                  }
+                >
+                  {message}
+                </p>
+              )}
+            </>
+          ) : (
+            <p style={styles.warning}>
+              {message || "No safety topic assigned."}
+            </p>
+          )}
+        </div>
+      )}
 
-                <p style={styles.topicText}>{topicText}</p>
+      {view === "dashboard" && isAdmin && (
+        <div style={styles.card}>
+          <h2>Superintendent Dashboard</h2>
+
+          {assignment && topic ? (
+            <>
+              <div style={styles.card}>
+                <h3 style={{ marginTop: 0 }}>Current Assignment</h3>
+
+                {project && (
+                  <p>
+                    <strong>Project:</strong> {project.project_name}
+                  </p>
+                )}
+
+                <p>
+                  <strong>Topic:</strong> {topic.title}
+                </p>
+
+                <p>
+                  <strong>Assigned Date:</strong> {assignment.assigned_date}
+                </p>
 
                 {topic.document_url && (
-                  <div style={{ marginTop: 16 }}>
+                  <p>
+                    <strong>Document:</strong>{" "}
                     <a
                       href={topic.document_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={styles.documentButton}
                     >
-                      Open Safety Document
-                      {topic.document_name ? `: ${topic.document_name}` : ""}
+                      {topic.document_name || topic.document_url}
                     </a>
-                  </div>
+                  </p>
                 )}
 
-                <div
-                  style={{
-                    marginTop: 24,
-                    padding: 16,
-                    border: "1px solid #d1d5db",
-                    borderRadius: 10,
-                    background: "#f9fafb",
-                  }}
-                >
-                  <label style={{ display: "flex", gap: 10, lineHeight: 1.5 }}>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      disabled={alreadyAcknowledged}
-                      onChange={(event) => setChecked(event.target.checked)}
-                      style={{ marginTop: 4 }}
-                    />
-                    <span>{acknowledgmentText}</span>
-                  </label>
+                <div style={styles.statsGrid}>
+                  <div style={styles.statBox}>
+                    <p style={styles.statNumber}>{totalWorkerCount}</p>
+                    <p style={styles.statLabel}>Project Workers</p>
+                  </div>
+
+                  <div style={styles.statBox}>
+                    <p style={styles.statNumber}>{signedCount}</p>
+                    <p style={styles.statLabel}>Signed</p>
+                  </div>
+
+                  <div style={styles.statBox}>
+                    <p style={styles.statNumber}>{pendingCount}</p>
+                    <p style={styles.statLabel}>Pending</p>
+                  </div>
                 </div>
 
                 <button
-                  onClick={acknowledge}
-                  disabled={alreadyAcknowledged}
-                  style={
-                    alreadyAcknowledged
-                      ? styles.disabledButton
-                      : styles.primaryButton
-                  }
+                  onClick={generatePdfReport}
+                  style={styles.reportButton}
                 >
-                  {acknowledgeButtonText}
+                  Generate PDF Report
                 </button>
-
-                {message && (
-                  <p
-                    style={
-                      alreadyAcknowledged || message.includes("successfully")
-                        ? styles.notice
-                        : styles.warning
-                    }
-                  >
-                    {message}
-                  </p>
-                )}
-              </>
-            ) : (
-              <p style={styles.warning}>
-                {message || "No safety topic assigned."}
-              </p>
-            )}
-          </div>
-        )}
-
-        {view === "dashboard" && isAdmin && (
-          <div style={styles.card}>
-            <h2>Superintendent Dashboard</h2>
-
-            {assignment && topic ? (
-              <>
-                <div style={styles.card}>
-                  <h3 style={{ marginTop: 0 }}>Current Assignment</h3>
-
-                  {project && (
-                    <p>
-                      <strong>Project:</strong> {project.project_name}
-                    </p>
-                  )}
-
-                  <p>
-                    <strong>Topic:</strong> {topic.title}
-                  </p>
-
-                  <p>
-                    <strong>Assigned Date:</strong> {assignment.assigned_date}
-                  </p>
-
-                  {topic.document_url && (
-                    <p>
-                      <strong>Document:</strong>{" "}
-                      <a
-                        href={topic.document_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {topic.document_name || topic.document_url}
-                      </a>
-                    </p>
-                  )}
-
-                  <div style={styles.statsGrid}>
-                    <div style={styles.statBox}>
-                      <p style={styles.statNumber}>{totalWorkerCount}</p>
-                      <p style={styles.statLabel}>Project Workers</p>
-                    </div>
-
-                    <div style={styles.statBox}>
-                      <p style={styles.statNumber}>{signedCount}</p>
-                      <p style={styles.statLabel}>Signed</p>
-                    </div>
-
-                    <div style={styles.statBox}>
-                      <p style={styles.statNumber}>{pendingCount}</p>
-                      <p style={styles.statLabel}>Pending</p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={generatePdfReport}
-                    style={styles.reportButton}
-                  >
-                    Generate PDF Report
-                  </button>
-                </div>
-
-                <h3>Project Worker Sign-Off Status</h3>
-
-                {workers.length > 0 ? (
-                  <div style={styles.tableWrap}>
-                    <table style={styles.table}>
-                      <thead>
-                        <tr>
-                          <th style={styles.th}>Worker</th>
-                          <th style={styles.th}>Email</th>
-                          <th style={styles.th}>Status</th>
-                          <th style={styles.th}>Time Acknowledged</th>
-                        </tr>
-                      </thead>
-
-                      <tbody>
-                        {workers.map((workerItem) => {
-                          const workerAck = getAcknowledgementForWorker(
-                            workerItem.id
-                          );
-
-                          const isSigned = Boolean(workerAck);
-
-                          return (
-                            <tr key={workerItem.id}>
-                              <td style={styles.td}>
-                                {workerItem.full_name}
-                              </td>
-
-                              <td style={styles.td}>
-                                {workerItem.email || "No email"}
-                              </td>
-
-                              <td style={styles.td}>
-                                <span
-                                  style={
-                                    isSigned
-                                      ? styles.signedBadge
-                                      : styles.pendingBadge
-                                  }
-                                >
-                                  {isSigned ? "Signed" : "Pending"}
-                                </span>
-                              </td>
-
-                              <td style={styles.td}>
-                                {formatDateTime(
-                                  workerAck?.acknowledged_at ||
-                                  workerAck?.Acknowledged_at
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p style={styles.warning}>
-                    No workers are assigned to this project yet. Add workers to
-                    this project under Admin Tools.
-                  </p>
-                )}
-              </>
-            ) : (
-              <p style={styles.warning}>
-                {message || "No assignment found for this project."}
-              </p>
-            )}
-          </div>
-        )}
-
-        {view === "admin" && isAdmin && (
-          <div style={styles.card}>
-            <h2>Admin Tools</h2>
-            <p>
-              Use these organized sections to manage projects, workers, safety
-              topics, and assignments.
-            </p>
-
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                flexWrap: "wrap",
-                marginTop: 16,
-              }}
-            >
-              {["projects", "workers", "topics", "assignments"].map(
-                (tabName) => (
-                  <button
-                    key={tabName}
-                    onClick={() => setAdminTab(tabName)}
-                    style={{
-                      ...styles.adminTabButton,
-                      background:
-                        adminTab === tabName ? "#2563eb" : "#ffffff",
-                      color: adminTab === tabName ? "#ffffff" : "#1f2937",
-                      fontWeight: adminTab === tabName ? "bold" : "normal",
-                    }}
-                  >
-                    {tabName === "projects" && "Projects"}
-                    {tabName === "workers" && "Workers"}
-                    {tabName === "topics" && "Safety Topics"}
-                    {tabName === "assignments" && "Assignments"}
-                  </button>
-                )
-              )}
-            </div>
-
-            {adminTab === "projects" && (
-              <div style={styles.card}>
-                <h3>Manage Projects</h3>
-                <p>
-                  Add new projects, rename existing projects, and mark projects
-                  active or inactive.
-                </p>
-
-                <div style={styles.card}>
-                  <h4 style={{ marginTop: 0 }}>Add New Project</h4>
-
-                  <input
-                    style={styles.input}
-                    placeholder="Project name"
-                    value={newProjectName}
-                    onChange={(event) => setNewProjectName(event.target.value)}
-                  />
-
-                  <button onClick={createProject} style={styles.primaryButton}>
-                    Create Project
-                  </button>
-                </div>
-
-                <h4>Existing Projects</h4>
-
-                {allProjects.length > 0 ? (
-                  <div style={styles.tableWrap}>
-                    <table style={styles.table}>
-                      <thead>
-                        <tr>
-                          <th style={styles.th}>Project Name</th>
-                          <th style={styles.th}>Active</th>
-                          <th style={styles.th}>Action</th>
-                        </tr>
-                      </thead>
-
-                      <tbody>
-                        {allProjects.map((projectItem) => (
-                          <tr key={projectItem.id}>
-                            <td style={styles.td}>
-                              <input
-                                style={styles.smallInput}
-                                value={projectItem.project_name || ""}
-                                onChange={(event) =>
-                                  updateProjectField(
-                                    projectItem.id,
-                                    "project_name",
-                                    event.target.value
-                                  )
-                                }
-                              />
-                            </td>
-
-                            <td style={styles.td}>
-                              <select
-                                style={styles.smallSelect}
-                                value={projectItem.active ? "true" : "false"}
-                                onChange={(event) =>
-                                  updateProjectField(
-                                    projectItem.id,
-                                    "active",
-                                    event.target.value === "true"
-                                  )
-                                }
-                              >
-                                <option value="true">Active</option>
-                                <option value="false">Inactive</option>
-                              </select>
-                            </td>
-
-                            <td style={styles.td}>
-                              <button
-                                onClick={() => updateProject(projectItem)}
-                                style={styles.saveButton}
-                              >
-                                Save
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p style={styles.warning}>No projects found.</p>
-                )}
               </div>
-            )}
 
-            {adminTab === "workers" && (
-              <div style={styles.card}>
-                <h3>Manage Workers</h3>
-                <p>
-                  Add workers, edit worker details, and link workers to
-                  projects.
-                </p>
+              <h3>Project Worker Sign-Off Status</h3>
 
-                <div style={styles.card}>
-                  <h4 style={{ marginTop: 0 }}>Add New Worker</h4>
-                  <p style={{ marginTop: 0, color: "#4b5563" }}>
-                    Worker login password will be their phone number using digits only.
-                  </p>
-                  <div style={styles.inlineGrid}>
-                    <label>
-                      Full Name
-                      <input
-                        style={styles.input}
-                        placeholder="Full name"
-                        value={newWorkerName}
-                        onChange={(event) =>
-                          setNewWorkerName(event.target.value)
-                        }
-                      />
-                    </label>
+              {workers.length > 0 ? (
+                <div style={styles.tableWrap}>
+                  <table style={styles.table}>
+                    <thead>
+                      <tr>
+                        <th style={styles.th}>Worker</th>
+                        <th style={styles.th}>Email</th>
+                        <th style={styles.th}>Status</th>
+                        <th style={styles.th}>Time Acknowledged</th>
+                      </tr>
+                    </thead>
 
-                    <label>
-                      Email
-                      <input
-                        style={styles.input}
-                        placeholder="Email"
-                        value={newWorkerEmail}
-                        onChange={(event) =>
-                          setNewWorkerEmail(event.target.value)
-                        }
-                      />
-                    </label>
+                    <tbody>
+                      {workers.map((workerItem) => {
+                        const workerAck = getAcknowledgementForWorker(
+                          workerItem.id
+                        );
 
-                    <label>
-                      Phone
-                      <input
-                        style={styles.input}
-                        placeholder="Phone"
-                        value={newWorkerPhone}
-                        onChange={(event) =>
-                          setNewWorkerPhone(event.target.value)
-                        }
-                      />
-                    </label>
+                        const isSigned = Boolean(workerAck);
 
-                    <label>
-                      Language
-                      <select
-                        style={styles.select}
-                        value={newWorkerLanguage}
-                        onChange={(event) =>
-                          setNewWorkerLanguage(event.target.value)
-                        }
-                      >
-                        <option value="english">English</option>
-                        <option value="spanish">Spanish</option>
-                      </select>
-                    </label>
-
-                    <label>
-                      Role
-                      <select
-                        style={styles.select}
-                        value={newWorkerRole}
-                        onChange={(event) =>
-                          setNewWorkerRole(event.target.value)
-                        }
-                      >
-                        <option value="worker">Worker</option>
-                        <option value="superintendent">Superintendent</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                    </label>
-                  </div>
-
-                  <button onClick={createWorker} style={styles.primaryButton}>
-                    Create Worker
-                  </button>
-                </div>
-
-                <div style={styles.card}>
-                  <h4 style={{ marginTop: 0 }}>Link Worker to Project</h4>
-
-                  <div style={styles.inlineGrid}>
-                    <label>
-                      Worker
-                      <select
-                        style={styles.select}
-                        value={linkWorkerId}
-                        onChange={(event) => setLinkWorkerId(event.target.value)}
-                      >
-                        <option value="">Select worker</option>
-                        {allWorkers.map((workerItem) => (
-                          <option key={workerItem.id} value={workerItem.id}>
-                            {workerItem.full_name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label>
-                      Project
-                      <select
-                        style={styles.select}
-                        value={linkProjectId}
-                        onChange={(event) =>
-                          setLinkProjectId(event.target.value)
-                        }
-                      >
-                        <option value="">Select project</option>
-                        {projects.map((projectItem) => (
-                          <option key={projectItem.id} value={projectItem.id}>
-                            {projectItem.project_name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-
-                  <button
-                    onClick={linkWorkerToProject}
-                    style={styles.primaryButton}
-                  >
-                    Link Worker
-                  </button>
-                </div>
-                <div style={styles.card}>
-                  <h4 style={{ marginTop: 0 }}>Project Worker Assignments</h4>
-
-                  <p style={{ color: "#4b5563" }}>
-                    Select a project to see which workers are assigned to it. You can remove a
-                    worker from a project without deleting their worker profile.
-                  </p>
-
-                  <label>
-                    Project
-                    <select
-                      style={styles.select}
-                      value={manageProjectWorkersId}
-                      onChange={(event) =>
-                        handleManageProjectWorkersChange(event.target.value)
-                      }
-                    >
-                      <option value="">Select project</option>
-                      {projects.map((projectItem) => (
-                        <option key={projectItem.id} value={projectItem.id}>
-                          {projectItem.project_name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  {manageProjectWorkersId ? (
-                    managedProjectWorkers.length > 0 ? (
-                      <div style={styles.tableWrap}>
-                        <table style={styles.table}>
-                          <thead>
-                            <tr>
-                              <th style={styles.th}>Worker</th>
-                              <th style={styles.th}>Email</th>
-                              <th style={styles.th}>Phone</th>
-                              <th style={styles.th}>Role</th>
-                              <th style={styles.th}>Action</th>
-                            </tr>
-                          </thead>
-
-                          <tbody>
-                            {managedProjectWorkers.map((workerItem) => (
-                              <tr key={workerItem.id}>
-                                <td style={styles.td}>{workerItem.full_name}</td>
-
-                                <td style={styles.td}>{workerItem.email || "No email"}</td>
-
-                                <td style={styles.td}>{workerItem.phone || "No phone"}</td>
-
-                                <td style={styles.td}>{workerItem.role || "worker"}</td>
-
-                                <td style={styles.td}>
-                                  <button
-                                    onClick={() =>
-                                      removeWorkerFromProject(
-                                        workerItem.worker_project_link_id
-                                      )
-                                    }
-                                    style={{
-                                      ...styles.saveButton,
-                                      background: "#dc2626",
-                                    }}
-                                  >
-                                    Remove
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <p style={styles.warning}>
-                        No workers are assigned to this project yet.
-                      </p>
-                    )
-                  ) : (
-                    <p style={styles.warning}>Select a project to view assigned workers.</p>
-                  )}
-                </div>
-                <h4>Existing Workers</h4>
-
-                {allWorkers.length > 0 ? (
-                  <div style={styles.tableWrap}>
-                    <table style={styles.table}>
-                      <thead>
-                        <tr>
-                          <th style={styles.th}>Name</th>
-                          <th style={styles.th}>Email</th>
-                          <th style={styles.th}>Phone</th>
-                          <th style={styles.th}>Language</th>
-                          <th style={styles.th}>Role</th>
-                          <th style={styles.th}>Action</th>
-                        </tr>
-                      </thead>
-
-                      <tbody>
-                        {allWorkers.map((workerItem) => (
+                        return (
                           <tr key={workerItem.id}>
                             <td style={styles.td}>
-                              <input
-                                style={styles.smallInput}
-                                value={workerItem.full_name || ""}
-                                onChange={(event) =>
-                                  updateWorkerField(
-                                    workerItem.id,
-                                    "full_name",
-                                    event.target.value
-                                  )
-                                }
-                              />
+                              {workerItem.full_name}
                             </td>
 
                             <td style={styles.td}>
@@ -2578,343 +2165,283 @@ export default function Home() {
                             </td>
 
                             <td style={styles.td}>
-                              <input
-                                style={styles.smallInput}
-                                value={workerItem.phone || ""}
-                                onChange={(event) =>
-                                  updateWorkerField(
-                                    workerItem.id,
-                                    "phone",
-                                    event.target.value
-                                  )
+                              <span
+                                style={
+                                  isSigned
+                                    ? styles.signedBadge
+                                    : styles.pendingBadge
                                 }
-                              />
+                              >
+                                {isSigned ? "Signed" : "Pending"}
+                              </span>
                             </td>
 
                             <td style={styles.td}>
-                              <select
-                                style={styles.smallSelect}
-                                value={
-                                  workerItem.preferred_language || "english"
-                                }
-                                onChange={(event) =>
-                                  updateWorkerField(
-                                    workerItem.id,
-                                    "preferred_language",
-                                    event.target.value
-                                  )
-                                }
-                              >
-                                <option value="english">English</option>
-                                <option value="spanish">Spanish</option>
-                              </select>
-                            </td>
-
-                            <td style={styles.td}>
-                              <select
-                                style={styles.smallSelect}
-                                value={workerItem.role || "worker"}
-                                onChange={(event) =>
-                                  updateWorkerField(
-                                    workerItem.id,
-                                    "role",
-                                    event.target.value
-                                  )
-                                }
-                              >
-                                <option value="worker">Worker</option>
-                                <option value="superintendent">
-                                  Superintendent
-                                </option>
-                                <option value="admin">Admin</option>
-                              </select>
-                            </td>
-
-                            <td style={styles.td}>
-                              <button
-                                onClick={() => updateWorker(workerItem)}
-                                style={styles.saveButton}
-                              >
-                                Save
-                              </button>
+                              {formatDateTime(
+                                workerAck?.acknowledged_at ||
+                                workerAck?.Acknowledged_at
+                              )}
                             </td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p style={styles.warning}>No workers found.</p>
-                )}
-              </div>
-            )}
-
-            {adminTab === "topics" && (
-              <div style={styles.card}>
-                <h3>Manage Safety Topics</h3>
-                <p>
-                  Add new topics, search existing topics, and edit one topic at
-                  a time.
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p style={styles.warning}>
+                  No workers are assigned to this project yet. Add workers to
+                  this project under Admin Tools.
                 </p>
+              )}
+            </>
+          ) : (
+            <p style={styles.warning}>
+              {message || "No assignment found for this project."}
+            </p>
+          )}
+        </div>
+      )}
 
+      {view === "admin" && isAdmin && (
+        <div style={styles.card}>
+          <h2>Admin Tools</h2>
+          <p>
+            Use these organized sections to manage projects, workers, safety
+            topics, and assignments.
+          </p>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              flexWrap: "wrap",
+              marginTop: 16,
+            }}
+          >
+            {["projects", "workers", "topics", "assignments"].map(
+              (tabName) => (
                 <button
-                  onClick={() => setShowAddTopicForm(!showAddTopicForm)}
-                  style={styles.primaryButton}
+                  key={tabName}
+                  onClick={() => setAdminTab(tabName)}
+                  style={{
+                    ...styles.adminTabButton,
+                    background:
+                      adminTab === tabName ? "#2563eb" : "#ffffff",
+                    color: adminTab === tabName ? "#ffffff" : "#1f2937",
+                    fontWeight: adminTab === tabName ? "bold" : "normal",
+                  }}
                 >
-                  {showAddTopicForm ? "Hide Add Topic Form" : "+ Add New Topic"}
+                  {tabName === "projects" && "Projects"}
+                  {tabName === "workers" && "Workers"}
+                  {tabName === "topics" && "Safety Topics"}
+                  {tabName === "assignments" && "Assignments"}
                 </button>
+              )
+            )}
+          </div>
 
-                {showAddTopicForm && (
-                  <div style={styles.card}>
-                    <h4 style={{ marginTop: 0 }}>Add New Safety Topic</h4>
+          {adminTab === "projects" && (
+            <div style={styles.card}>
+              <h3>Manage Projects</h3>
+              <p>
+                Add new projects, rename existing projects, and mark projects
+                active or inactive.
+              </p>
 
-                    <input
-                      style={styles.input}
-                      placeholder="Topic title"
-                      value={newTopicTitle}
-                      onChange={(event) =>
-                        setNewTopicTitle(event.target.value)
-                      }
-                    />
+              <div style={styles.card}>
+                <h4 style={{ marginTop: 0 }}>Add New Project</h4>
 
-                    <textarea
-                      style={styles.textarea}
-                      placeholder="English content"
-                      value={newTopicEnglish}
-                      onChange={(event) =>
-                        setNewTopicEnglish(event.target.value)
-                      }
-                    />
+                <input
+                  style={styles.input}
+                  placeholder="Project name"
+                  value={newProjectName}
+                  onChange={(event) => setNewProjectName(event.target.value)}
+                />
 
-                    <textarea
-                      style={styles.textarea}
-                      placeholder="Spanish content"
-                      value={newTopicSpanish}
-                      onChange={(event) =>
-                        setNewTopicSpanish(event.target.value)
-                      }
-                    />
+                <button onClick={createProject} style={styles.primaryButton}>
+                  Create Project
+                </button>
+              </div>
 
-                    <input
-                      style={styles.input}
-                      placeholder="Document name, example: Ladder Safety PDF"
-                      value={newTopicDocumentName}
-                      onChange={(event) =>
-                        setNewTopicDocumentName(event.target.value)
-                      }
-                    />
+              <h4>Existing Projects</h4>
 
-                    <input
-                      key={fileInputKey}
-                      style={styles.input}
-                      type="file"
-                      accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                      onChange={(event) =>
-                        setNewTopicFile(event.target.files?.[0] || null)
-                      }
-                    />
+              {allProjects.length > 0 ? (
+                <div style={styles.tableWrap}>
+                  <table style={styles.table}>
+                    <thead>
+                      <tr>
+                        <th style={styles.th}>Project Name</th>
+                        <th style={styles.th}>Active</th>
+                        <th style={styles.th}>Action</th>
+                      </tr>
+                    </thead>
 
-                    {newTopicFile && (
-                      <p>
-                        Selected file: <strong>{newTopicFile.name}</strong>
-                      </p>
-                    )}
+                    <tbody>
+                      {allProjects.map((projectItem) => (
+                        <tr key={projectItem.id}>
+                          <td style={styles.td}>
+                            <input
+                              style={styles.smallInput}
+                              value={projectItem.project_name || ""}
+                              onChange={(event) =>
+                                updateProjectField(
+                                  projectItem.id,
+                                  "project_name",
+                                  event.target.value
+                                )
+                              }
+                            />
+                          </td>
 
-                    <input
-                      style={styles.input}
-                      placeholder="Optional document URL if not uploading a file"
-                      value={newTopicDocumentUrl}
-                      onChange={(event) =>
-                        setNewTopicDocumentUrl(event.target.value)
-                      }
-                    />
+                          <td style={styles.td}>
+                            <select
+                              style={styles.smallSelect}
+                              value={projectItem.active ? "true" : "false"}
+                              onChange={(event) =>
+                                updateProjectField(
+                                  projectItem.id,
+                                  "active",
+                                  event.target.value === "true"
+                                )
+                              }
+                            >
+                              <option value="true">Active</option>
+                              <option value="false">Inactive</option>
+                            </select>
+                          </td>
 
-                    <button
-                      onClick={createSafetyTopic}
-                      style={
-                        uploadingDocument
-                          ? styles.disabledButton
-                          : styles.primaryButton
-                      }
-                      disabled={uploadingDocument}
-                    >
-                      {uploadingDocument
-                        ? "Uploading..."
-                        : "Create Safety Topic"}
-                    </button>
-                  </div>
-                )}
-
-                <div style={styles.card}>
-                  <h4 style={{ marginTop: 0 }}>Existing Safety Topics</h4>
-
-                  <input
-                    style={styles.input}
-                    placeholder="Search safety topics..."
-                    value={topicSearch}
-                    onChange={(event) => setTopicSearch(event.target.value)}
-                  />
-
-                  {filteredTopics.length > 0 ? (
-                    <div style={styles.compactList}>
-                      {filteredTopics.map((topicItem) => (
-                        <div key={topicItem.id} style={styles.compactListItem}>
-                          <div>
-                            <strong>{topicItem.title}</strong>
-                            {topicItem.document_url && (
-                              <div style={{ fontSize: 13, color: "#4b5563" }}>
-                                Document attached
-                              </div>
-                            )}
-                          </div>
-
-                          <button
-                            onClick={() => setSelectedTopicId(topicItem.id)}
-                            style={styles.saveButton}
-                          >
-                            Edit
-                          </button>
-                        </div>
+                          <td style={styles.td}>
+                            <button
+                              onClick={() => updateProject(projectItem)}
+                              style={styles.saveButton}
+                            >
+                              Save
+                            </button>
+                          </td>
+                        </tr>
                       ))}
-                    </div>
-                  ) : (
-                    <p style={styles.warning}>No safety topics found.</p>
-                  )}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p style={styles.warning}>No projects found.</p>
+              )}
+            </div>
+          )}
+
+          {adminTab === "workers" && (
+            <div style={styles.card}>
+              <h3>Manage Workers</h3>
+              <p>
+                Add workers, edit worker details, and link workers to
+                projects.
+              </p>
+
+              <div style={styles.card}>
+                <h4 style={{ marginTop: 0 }}>Add New Worker</h4>
+                <p style={{ marginTop: 0, color: "#4b5563" }}>
+                  Worker login password will be their phone number using digits only.
+                </p>
+                <div style={styles.inlineGrid}>
+                  <label>
+                    Full Name
+                    <input
+                      style={styles.input}
+                      placeholder="Full name"
+                      value={newWorkerName}
+                      onChange={(event) =>
+                        setNewWorkerName(event.target.value)
+                      }
+                    />
+                  </label>
+
+                  <label>
+                    Email
+                    <input
+                      style={styles.input}
+                      placeholder="Email"
+                      value={newWorkerEmail}
+                      onChange={(event) =>
+                        setNewWorkerEmail(event.target.value)
+                      }
+                    />
+                  </label>
+
+                  <label>
+                    Phone
+                    <input
+                      style={styles.input}
+                      placeholder="Phone"
+                      value={newWorkerPhone}
+                      onChange={(event) =>
+                        setNewWorkerPhone(event.target.value)
+                      }
+                    />
+                  </label>
+
+                  <label>
+                    Language
+                    <select
+                      style={styles.select}
+                      value={newWorkerLanguage}
+                      onChange={(event) =>
+                        setNewWorkerLanguage(event.target.value)
+                      }
+                    >
+                      <option value="english">English</option>
+                      <option value="spanish">Spanish</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    Role
+                    <select
+                      style={styles.select}
+                      value={newWorkerRole}
+                      onChange={(event) =>
+                        setNewWorkerRole(event.target.value)
+                      }
+                    >
+                      <option value="worker">Worker</option>
+                      <option value="superintendent">Superintendent</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </label>
                 </div>
 
-                {selectedTopicForEdit && (
-                  <div style={styles.card}>
-                    <h4 style={{ marginTop: 0 }}>
-                      Edit Topic: {selectedTopicForEdit.title}
-                    </h4>
-
-                    <label>
-                      Topic Title
-                      <input
-                        style={styles.input}
-                        value={selectedTopicForEdit.title || ""}
-                        onChange={(event) =>
-                          updateTopicField(
-                            selectedTopicForEdit.id,
-                            "title",
-                            event.target.value
-                          )
-                        }
-                      />
-                    </label>
-
-                    <label>
-                      English Content
-                      <textarea
-                        style={styles.textarea}
-                        value={selectedTopicForEdit.english_content || ""}
-                        onChange={(event) =>
-                          updateTopicField(
-                            selectedTopicForEdit.id,
-                            "english_content",
-                            event.target.value
-                          )
-                        }
-                      />
-                    </label>
-
-                    <label>
-                      Spanish Content
-                      <textarea
-                        style={styles.textarea}
-                        value={selectedTopicForEdit.spanish_content || ""}
-                        onChange={(event) =>
-                          updateTopicField(
-                            selectedTopicForEdit.id,
-                            "spanish_content",
-                            event.target.value
-                          )
-                        }
-                      />
-                    </label>
-
-                    <label>
-                      Document Name
-                      <input
-                        style={styles.input}
-                        value={selectedTopicForEdit.document_name || ""}
-                        placeholder="Document name"
-                        onChange={(event) =>
-                          updateTopicField(
-                            selectedTopicForEdit.id,
-                            "document_name",
-                            event.target.value
-                          )
-                        }
-                      />
-                    </label>
-
-                    <label>
-                      Document URL
-                      <input
-                        style={styles.input}
-                        value={selectedTopicForEdit.document_url || ""}
-                        placeholder="Document URL"
-                        onChange={(event) =>
-                          updateTopicField(
-                            selectedTopicForEdit.id,
-                            "document_url",
-                            event.target.value
-                          )
-                        }
-                      />
-                    </label>
-
-                    {selectedTopicForEdit.document_url && (
-                      <p>
-                        <a
-                          href={selectedTopicForEdit.document_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Open current document
-                        </a>
-                      </p>
-                    )}
-
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      <button
-                        onClick={() => updateSafetyTopic(selectedTopicForEdit)}
-                        style={styles.saveButton}
-                      >
-                        Save Safety Topic
-                      </button>
-
-                      <button
-                        onClick={() => setSelectedTopicId("")}
-                        style={styles.button}
-                      >
-                        Close
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <button onClick={createWorker} style={styles.primaryButton}>
+                  Create Worker
+                </button>
               </div>
-            )}
 
-            {adminTab === "assignments" && (
               <div style={styles.card}>
-                <h3>Manage Assignments</h3>
-                <p>
-                  Assign safety topics to projects and review previous
-                  assignments.
-                </p>
+                <h4 style={{ marginTop: 0 }}>Link Worker to Project</h4>
 
-                <div style={styles.card}>
-                  <h4 style={{ marginTop: 0 }}>Create New Assignment</h4>
+                <div style={styles.inlineGrid}>
+                  <label>
+                    Worker
+                    <select
+                      style={styles.select}
+                      value={linkWorkerId}
+                      onChange={(event) => setLinkWorkerId(event.target.value)}
+                    >
+                      <option value="">Select worker</option>
+                      {allWorkers.map((workerItem) => (
+                        <option key={workerItem.id} value={workerItem.id}>
+                          {workerItem.full_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
                   <label>
                     Project
                     <select
                       style={styles.select}
-                      value={assignmentProjectId}
+                      value={linkProjectId}
                       onChange={(event) =>
-                        setAssignmentProjectId(event.target.value)
+                        setLinkProjectId(event.target.value)
                       }
                     >
                       <option value="">Select project</option>
@@ -2925,83 +2452,79 @@ export default function Home() {
                       ))}
                     </select>
                   </label>
-
-                  <label>
-                    Safety Topic
-                    <select
-                      style={styles.select}
-                      value={assignmentTopicId}
-                      onChange={(event) =>
-                        setAssignmentTopicId(event.target.value)
-                      }
-                    >
-                      <option value="">Select topic</option>
-                      {allTopics.map((topicItem) => (
-                        <option key={topicItem.id} value={topicItem.id}>
-                          {topicItem.title}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    Date
-                    <input
-                      style={styles.input}
-                      type="date"
-                      value={assignmentDate}
-                      onChange={(event) =>
-                        setAssignmentDate(event.target.value)
-                      }
-                    />
-                  </label>
-
-                  <button
-                    onClick={createAssignment}
-                    style={styles.primaryButton}
-                  >
-                    Assign Topic
-                  </button>
                 </div>
 
-                <div style={styles.card}>
-                  <h4 style={{ marginTop: 0 }}>Existing Assignments</h4>
+                <button
+                  onClick={linkWorkerToProject}
+                  style={styles.primaryButton}
+                >
+                  Link Worker
+                </button>
+              </div>
+              <div style={styles.card}>
+                <h4 style={{ marginTop: 0 }}>Project Worker Assignments</h4>
 
-                  {allAssignments.length > 0 ? (
+                <p style={{ color: "#4b5563" }}>
+                  Select a project to see which workers are assigned to it. You can remove a
+                  worker from a project without deleting their worker profile.
+                </p>
+
+                <label>
+                  Project
+                  <select
+                    style={styles.select}
+                    value={manageProjectWorkersId}
+                    onChange={(event) =>
+                      handleManageProjectWorkersChange(event.target.value)
+                    }
+                  >
+                    <option value="">Select project</option>
+                    {projects.map((projectItem) => (
+                      <option key={projectItem.id} value={projectItem.id}>
+                        {projectItem.project_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {manageProjectWorkersId ? (
+                  managedProjectWorkers.length > 0 ? (
                     <div style={styles.tableWrap}>
                       <table style={styles.table}>
                         <thead>
                           <tr>
-                            <th style={styles.th}>Assigned Date</th>
-                            <th style={styles.th}>Project</th>
-                            <th style={styles.th}>Safety Topic</th>
+                            <th style={styles.th}>Worker</th>
+                            <th style={styles.th}>Email</th>
+                            <th style={styles.th}>Phone</th>
+                            <th style={styles.th}>Role</th>
                             <th style={styles.th}>Action</th>
                           </tr>
                         </thead>
 
                         <tbody>
-                          {allAssignments.map((assignmentItem) => (
-                            <tr key={assignmentItem.id}>
-                              <td style={styles.td}>
-                                {assignmentItem.assigned_date}
-                              </td>
+                          {managedProjectWorkers.map((workerItem) => (
+                            <tr key={workerItem.id}>
+                              <td style={styles.td}>{workerItem.full_name}</td>
 
-                              <td style={styles.td}>
-                                {assignmentItem.project_name || "No project"}
-                              </td>
+                              <td style={styles.td}>{workerItem.email || "No email"}</td>
 
-                              <td style={styles.td}>
-                                {assignmentItem.topic_title || "No topic"}
-                              </td>
+                              <td style={styles.td}>{workerItem.phone || "No phone"}</td>
+
+                              <td style={styles.td}>{workerItem.role || "worker"}</td>
 
                               <td style={styles.td}>
                                 <button
                                   onClick={() =>
-                                    viewAssignmentDashboard(assignmentItem)
+                                    removeWorkerFromProject(
+                                      workerItem.worker_project_link_id
+                                    )
                                   }
-                                  style={styles.saveButton}
+                                  style={{
+                                    ...styles.saveButton,
+                                    background: "#dc2626",
+                                  }}
                                 >
-                                  View Dashboard
+                                  Remove
                                 </button>
                               </td>
                             </tr>
@@ -3010,63 +2533,541 @@ export default function Home() {
                       </table>
                     </div>
                   ) : (
-                    <p style={styles.warning}>No assignments found.</p>
-                  )}
-                </div>
+                    <p style={styles.warning}>
+                      No workers are assigned to this project yet.
+                    </p>
+                  )
+                ) : (
+                  <p style={styles.warning}>Select a project to view assigned workers.</p>
+                )}
+              </div>
+              <h4>Existing Workers</h4>
 
-                <div style={styles.card}>
-                  <h4 style={{ marginTop: 0 }}>Weekly Report</h4>
+              {allWorkers.length > 0 ? (
+                <div style={styles.tableWrap}>
+                  <table style={styles.table}>
+                    <thead>
+                      <tr>
+                        <th style={styles.th}>Name</th>
+                        <th style={styles.th}>Email</th>
+                        <th style={styles.th}>Phone</th>
+                        <th style={styles.th}>Language</th>
+                        <th style={styles.th}>Role</th>
+                        <th style={styles.th}>Action</th>
+                      </tr>
+                    </thead>
 
-                  <p style={{ color: "#4b5563" }}>
-                    Generate one report for all safety assignments on a project during a date
-                    range.
-                  </p>
+                    <tbody>
+                      {allWorkers.map((workerItem) => (
+                        <tr key={workerItem.id}>
+                          <td style={styles.td}>
+                            <input
+                              style={styles.smallInput}
+                              value={workerItem.full_name || ""}
+                              onChange={(event) =>
+                                updateWorkerField(
+                                  workerItem.id,
+                                  "full_name",
+                                  event.target.value
+                                )
+                              }
+                            />
+                          </td>
 
-                  <label>
-                    Project
-                    <select
-                      style={styles.select}
-                      value={weeklyReportProjectId}
-                      onChange={(event) => setWeeklyReportProjectId(event.target.value)}
-                    >
-                      <option value="">Select project</option>
-                      {allProjects.map((projectItem) => (
-                        <option key={projectItem.id} value={projectItem.id}>
-                          {projectItem.project_name}
-                        </option>
+                          <td style={styles.td}>
+                            {workerItem.email || "No email"}
+                          </td>
+
+                          <td style={styles.td}>
+                            <input
+                              style={styles.smallInput}
+                              value={workerItem.phone || ""}
+                              onChange={(event) =>
+                                updateWorkerField(
+                                  workerItem.id,
+                                  "phone",
+                                  event.target.value
+                                )
+                              }
+                            />
+                          </td>
+
+                          <td style={styles.td}>
+                            <select
+                              style={styles.smallSelect}
+                              value={
+                                workerItem.preferred_language || "english"
+                              }
+                              onChange={(event) =>
+                                updateWorkerField(
+                                  workerItem.id,
+                                  "preferred_language",
+                                  event.target.value
+                                )
+                              }
+                            >
+                              <option value="english">English</option>
+                              <option value="spanish">Spanish</option>
+                            </select>
+                          </td>
+
+                          <td style={styles.td}>
+                            <select
+                              style={styles.smallSelect}
+                              value={workerItem.role || "worker"}
+                              onChange={(event) =>
+                                updateWorkerField(
+                                  workerItem.id,
+                                  "role",
+                                  event.target.value
+                                )
+                              }
+                            >
+                              <option value="worker">Worker</option>
+                              <option value="superintendent">
+                                Superintendent
+                              </option>
+                              <option value="admin">Admin</option>
+                            </select>
+                          </td>
+
+                          <td style={styles.td}>
+                            <button
+                              onClick={() => updateWorker(workerItem)}
+                              style={styles.saveButton}
+                            >
+                              Save
+                            </button>
+                          </td>
+                        </tr>
                       ))}
-                    </select>
-                  </label>
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p style={styles.warning}>No workers found.</p>
+              )}
+            </div>
+          )}
 
-                  <label>
-                    Start Date
-                    <input
-                      style={styles.input}
-                      type="date"
-                      value={weeklyReportStartDate}
-                      onChange={(event) => setWeeklyReportStartDate(event.target.value)}
-                    />
-                  </label>
+          {adminTab === "topics" && (
+            <div style={styles.card}>
+              <h3>Manage Safety Topics</h3>
+              <p>
+                Add new topics, search existing topics, and edit one topic at
+                a time.
+              </p>
 
-                  <label>
-                    End Date
-                    <input
-                      style={styles.input}
-                      type="date"
-                      value={weeklyReportEndDate}
-                      onChange={(event) => setWeeklyReportEndDate(event.target.value)}
-                    />
-                  </label>
+              <button
+                onClick={() => setShowAddTopicForm(!showAddTopicForm)}
+                style={styles.primaryButton}
+              >
+                {showAddTopicForm ? "Hide Add Topic Form" : "+ Add New Topic"}
+              </button>
 
-                  <button onClick={generateWeeklyReport} style={styles.reportButton}>
-                    Generate Weekly Report
+              {showAddTopicForm && (
+                <div style={styles.card}>
+                  <h4 style={{ marginTop: 0 }}>Add New Safety Topic</h4>
+
+                  <input
+                    style={styles.input}
+                    placeholder="Topic title"
+                    value={newTopicTitle}
+                    onChange={(event) =>
+                      setNewTopicTitle(event.target.value)
+                    }
+                  />
+
+                  <textarea
+                    style={styles.textarea}
+                    placeholder="English content"
+                    value={newTopicEnglish}
+                    onChange={(event) =>
+                      setNewTopicEnglish(event.target.value)
+                    }
+                  />
+
+                  <textarea
+                    style={styles.textarea}
+                    placeholder="Spanish content"
+                    value={newTopicSpanish}
+                    onChange={(event) =>
+                      setNewTopicSpanish(event.target.value)
+                    }
+                  />
+
+                  <input
+                    style={styles.input}
+                    placeholder="Document name, example: Ladder Safety PDF"
+                    value={newTopicDocumentName}
+                    onChange={(event) =>
+                      setNewTopicDocumentName(event.target.value)
+                    }
+                  />
+
+                  <input
+                    key={fileInputKey}
+                    style={styles.input}
+                    type="file"
+                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                    onChange={(event) =>
+                      setNewTopicFile(event.target.files?.[0] || null)
+                    }
+                  />
+
+                  {newTopicFile && (
+                    <p>
+                      Selected file: <strong>{newTopicFile.name}</strong>
+                    </p>
+                  )}
+
+                  <input
+                    style={styles.input}
+                    placeholder="Optional document URL if not uploading a file"
+                    value={newTopicDocumentUrl}
+                    onChange={(event) =>
+                      setNewTopicDocumentUrl(event.target.value)
+                    }
+                  />
+
+                  <button
+                    onClick={createSafetyTopic}
+                    style={
+                      uploadingDocument
+                        ? styles.disabledButton
+                        : styles.primaryButton
+                    }
+                    disabled={uploadingDocument}
+                  >
+                    {uploadingDocument
+                      ? "Uploading..."
+                      : "Create Safety Topic"}
                   </button>
                 </div>
+              )}
+
+              <div style={styles.card}>
+                <h4 style={{ marginTop: 0 }}>Existing Safety Topics</h4>
+
+                <input
+                  style={styles.input}
+                  placeholder="Search safety topics..."
+                  value={topicSearch}
+                  onChange={(event) => setTopicSearch(event.target.value)}
+                />
+
+                {filteredTopics.length > 0 ? (
+                  <div style={styles.compactList}>
+                    {filteredTopics.map((topicItem) => (
+                      <div key={topicItem.id} style={styles.compactListItem}>
+                        <div>
+                          <strong>{topicItem.title}</strong>
+                          {topicItem.document_url && (
+                            <div style={{ fontSize: 13, color: "#4b5563" }}>
+                              Document attached
+                            </div>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => setSelectedTopicId(topicItem.id)}
+                          style={styles.saveButton}
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={styles.warning}>No safety topics found.</p>
+                )}
               </div>
-            )}
-          </div>
-        )}
-      </div>
-    </main>
-  );
+
+              {selectedTopicForEdit && (
+                <div style={styles.card}>
+                  <h4 style={{ marginTop: 0 }}>
+                    Edit Topic: {selectedTopicForEdit.title}
+                  </h4>
+
+                  <label>
+                    Topic Title
+                    <input
+                      style={styles.input}
+                      value={selectedTopicForEdit.title || ""}
+                      onChange={(event) =>
+                        updateTopicField(
+                          selectedTopicForEdit.id,
+                          "title",
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+
+                  <label>
+                    English Content
+                    <textarea
+                      style={styles.textarea}
+                      value={selectedTopicForEdit.english_content || ""}
+                      onChange={(event) =>
+                        updateTopicField(
+                          selectedTopicForEdit.id,
+                          "english_content",
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+
+                  <label>
+                    Spanish Content
+                    <textarea
+                      style={styles.textarea}
+                      value={selectedTopicForEdit.spanish_content || ""}
+                      onChange={(event) =>
+                        updateTopicField(
+                          selectedTopicForEdit.id,
+                          "spanish_content",
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+
+                  <label>
+                    Document Name
+                    <input
+                      style={styles.input}
+                      value={selectedTopicForEdit.document_name || ""}
+                      placeholder="Document name"
+                      onChange={(event) =>
+                        updateTopicField(
+                          selectedTopicForEdit.id,
+                          "document_name",
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+
+                  <label>
+                    Document URL
+                    <input
+                      style={styles.input}
+                      value={selectedTopicForEdit.document_url || ""}
+                      placeholder="Document URL"
+                      onChange={(event) =>
+                        updateTopicField(
+                          selectedTopicForEdit.id,
+                          "document_url",
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+
+                  {selectedTopicForEdit.document_url && (
+                    <p>
+                      <a
+                        href={selectedTopicForEdit.document_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Open current document
+                      </a>
+                    </p>
+                  )}
+
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <button
+                      onClick={() => updateSafetyTopic(selectedTopicForEdit)}
+                      style={styles.saveButton}
+                    >
+                      Save Safety Topic
+                    </button>
+
+                    <button
+                      onClick={() => setSelectedTopicId("")}
+                      style={styles.button}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {adminTab === "assignments" && (
+            <div style={styles.card}>
+              <h3>Manage Assignments</h3>
+              <p>
+                Assign safety topics to projects and review previous
+                assignments.
+              </p>
+
+              <div style={styles.card}>
+                <h4 style={{ marginTop: 0 }}>Create New Assignment</h4>
+
+                <label>
+                  Project
+                  <select
+                    style={styles.select}
+                    value={assignmentProjectId}
+                    onChange={(event) =>
+                      setAssignmentProjectId(event.target.value)
+                    }
+                  >
+                    <option value="">Select project</option>
+                    {projects.map((projectItem) => (
+                      <option key={projectItem.id} value={projectItem.id}>
+                        {projectItem.project_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Safety Topic
+                  <select
+                    style={styles.select}
+                    value={assignmentTopicId}
+                    onChange={(event) =>
+                      setAssignmentTopicId(event.target.value)
+                    }
+                  >
+                    <option value="">Select topic</option>
+                    {allTopics.map((topicItem) => (
+                      <option key={topicItem.id} value={topicItem.id}>
+                        {topicItem.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Date
+                  <input
+                    style={styles.input}
+                    type="date"
+                    value={assignmentDate}
+                    onChange={(event) =>
+                      setAssignmentDate(event.target.value)
+                    }
+                  />
+                </label>
+
+                <button
+                  onClick={createAssignment}
+                  style={styles.primaryButton}
+                >
+                  Assign Topic
+                </button>
+              </div>
+
+              <div style={styles.card}>
+                <h4 style={{ marginTop: 0 }}>Existing Assignments</h4>
+
+                {allAssignments.length > 0 ? (
+                  <div style={styles.tableWrap}>
+                    <table style={styles.table}>
+                      <thead>
+                        <tr>
+                          <th style={styles.th}>Assigned Date</th>
+                          <th style={styles.th}>Project</th>
+                          <th style={styles.th}>Safety Topic</th>
+                          <th style={styles.th}>Action</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {allAssignments.map((assignmentItem) => (
+                          <tr key={assignmentItem.id}>
+                            <td style={styles.td}>
+                              {assignmentItem.assigned_date}
+                            </td>
+
+                            <td style={styles.td}>
+                              {assignmentItem.project_name || "No project"}
+                            </td>
+
+                            <td style={styles.td}>
+                              {assignmentItem.topic_title || "No topic"}
+                            </td>
+
+                            <td style={styles.td}>
+                              <button
+                                onClick={() =>
+                                  viewAssignmentDashboard(assignmentItem)
+                                }
+                                style={styles.saveButton}
+                              >
+                                View Dashboard
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p style={styles.warning}>No assignments found.</p>
+                )}
+              </div>
+
+              <div style={styles.card}>
+                <h4 style={{ marginTop: 0 }}>Weekly Report</h4>
+
+                <p style={{ color: "#4b5563" }}>
+                  Generate one report for all safety assignments on a project during a date
+                  range.
+                </p>
+
+                <label>
+                  Project
+                  <select
+                    style={styles.select}
+                    value={weeklyReportProjectId}
+                    onChange={(event) => setWeeklyReportProjectId(event.target.value)}
+                  >
+                    <option value="">Select project</option>
+                    {allProjects.map((projectItem) => (
+                      <option key={projectItem.id} value={projectItem.id}>
+                        {projectItem.project_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Start Date
+                  <input
+                    style={styles.input}
+                    type="date"
+                    value={weeklyReportStartDate}
+                    onChange={(event) => setWeeklyReportStartDate(event.target.value)}
+                  />
+                </label>
+
+                <label>
+                  End Date
+                  <input
+                    style={styles.input}
+                    type="date"
+                    value={weeklyReportEndDate}
+                    onChange={(event) => setWeeklyReportEndDate(event.target.value)}
+                  />
+                </label>
+
+                <button onClick={generateWeeklyReport} style={styles.reportButton}>
+                  Generate Weekly Report
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  </main>
+);
 }

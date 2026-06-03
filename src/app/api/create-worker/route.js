@@ -2,6 +2,82 @@ import { createClient } from "@supabase/supabase-js";
 
 export async function POST(request) {
   try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+      return Response.json(
+        { error: "Server is missing Supabase environment variables." },
+        { status: 500 }
+      );
+    }
+
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.replace("Bearer ", "");
+
+    if (!token) {
+      return Response.json(
+        { error: "You must be logged in to create workers." },
+        { status: 401 }
+      );
+    }
+
+    const userSupabase = createClient(supabaseUrl, anonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+
+    const {
+      data: { user },
+      error: userError,
+    } = await userSupabase.auth.getUser(token);
+
+    if (userError || !user?.email) {
+      return Response.json(
+        { error: "Could not verify logged-in user." },
+        { status: 401 }
+      );
+    }
+
+    const adminSupabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+
+    const { data: requestingWorker, error: requestingWorkerError } =
+      await adminSupabase
+        .from("workers")
+        .select("id, email, role")
+        .eq("email", user.email)
+        .maybeSingle();
+
+    if (requestingWorkerError) {
+      return Response.json(
+        { error: requestingWorkerError.message },
+        { status: 400 }
+      );
+    }
+
+    if (
+      !requestingWorker ||
+      !["admin", "superintendent"].includes(requestingWorker.role)
+    ) {
+      return Response.json(
+        { error: "Only admins and superintendents can create workers." },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
 
     const fullName = body.fullName?.trim();
@@ -33,23 +109,6 @@ export async function POST(request) {
         { status: 400 }
       );
     }
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !serviceRoleKey) {
-      return Response.json(
-        { error: "Server is missing Supabase environment variables." },
-        { status: 500 }
-      );
-    }
-
-    const adminSupabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
 
     const { data: existingWorker } = await adminSupabase
       .from("workers")
