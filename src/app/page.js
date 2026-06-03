@@ -11,7 +11,7 @@ export default function Home() {
   const [allProjects, setAllProjects] = useState([]);
   const [allWorkers, setAllWorkers] = useState([]);
   const [allTopics, setAllTopics] = useState([]);
-
+const [allAssignments, setAllAssignments] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [topic, setTopic] = useState(null);
   const [project, setProject] = useState(null);
@@ -769,27 +769,28 @@ export default function Home() {
     return data || [];
   }
 
-  async function loadAllTopics() {
-    const { data, error } = await supabase
-      .from("safety_topics")
-      .select("*")
-      .order("title", { ascending: true });
+async function loadAllAssignments() {
+  const { data, error } = await supabase
+    .from("daily_assignments")
+    .select("id, assigned_date, projects(project_name), safety_topics(title)")
+    .order("assigned_date", { ascending: false });
 
-    if (error) {
-      console.log(error);
-      setAllTopics([]);
-      return [];
-    }
-
-    setAllTopics(data || []);
-    return data || [];
+  if (error) {
+    console.log(error);
+    setAllAssignments([]);
+    return [];
   }
+
+  setAllAssignments(data || []);
+  return data || [];
+}
 
   async function refreshAdminLists() {
     const projectList = await loadProjects();
     await loadAllProjects();
-    await loadAllWorkers();
-    await loadAllTopics();
+await loadAllWorkers();
+await loadAllTopics();
+await loadAllAssignments();
 
     if (!selectedProjectId && projectList.length > 0) {
       setSelectedProjectId(projectList[0].id);
@@ -1306,6 +1307,7 @@ export default function Home() {
     }
 
     await loadAllTopics();
+    await loadAllAssignments();
 
     if (topic?.id === topicItem.id) {
       await loadLatestAssignmentForProject(selectedProjectId, worker);
@@ -1350,9 +1352,11 @@ export default function Home() {
     setAssignmentTopicId("");
     setAssignmentDate("");
 
-    if (assignmentProjectId === selectedProjectId) {
+        if (assignmentProjectId === selectedProjectId) {
       await loadLatestAssignmentForProject(selectedProjectId, worker);
     }
+
+    await loadAllAssignments();
 
     alert("Safety topic assigned to project.");
   }
