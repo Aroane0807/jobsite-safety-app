@@ -41,8 +41,8 @@ export default function Home() {
 
   const [linkWorkerId, setLinkWorkerId] = useState("");
   const [linkProjectId, setLinkProjectId] = useState("");
-const [manageProjectWorkersId, setManageProjectWorkersId] = useState("");
-const [managedProjectWorkers, setManagedProjectWorkers] = useState([]);
+  const [manageProjectWorkersId, setManageProjectWorkersId] = useState("");
+  const [managedProjectWorkers, setManagedProjectWorkers] = useState([]);
   const [topicSearch, setTopicSearch] = useState("");
   const [selectedTopicId, setSelectedTopicId] = useState("");
   const [showAddTopicForm, setShowAddTopicForm] = useState(false);
@@ -76,7 +76,16 @@ const [managedProjectWorkers, setManagedProjectWorkers] = useState([]);
       topicItem.spanish_content?.toLowerCase().includes(search)
     );
   });
+  const filteredWorkers = allWorkers.filter((workerItem) => {
+    const search = workerSearch.toLowerCase();
 
+    return (
+      workerItem.full_name?.toLowerCase().includes(search) ||
+      workerItem.email?.toLowerCase().includes(search) ||
+      workerItem.phone?.toLowerCase().includes(search) ||
+      workerItem.role?.toLowerCase().includes(search)
+    );
+  });
   const signedCount = workers.filter((workerItem) =>
     acknowledgements.some((ack) => ack.worker_id === workerItem.id)
   ).length;
@@ -115,23 +124,23 @@ const [managedProjectWorkers, setManagedProjectWorkers] = useState([]);
 
   const styles = {
     page: {
-  minHeight: "100vh",
-  background: "#f4f6f8",
-  padding: "12px",
-  fontFamily: "Arial, sans-serif",
-  color: "#1f2937",
-},
+      minHeight: "100vh",
+      background: "#f4f6f8",
+      padding: "12px",
+      fontFamily: "Arial, sans-serif",
+      color: "#1f2937",
+    },
     container: {
       maxWidth: 1100,
       margin: "0 auto",
     },
     header: {
-  background: "#111827",
-  color: "#ffffff",
-  borderRadius: 12,
-  padding: 16,
-  marginBottom: 12,
-},
+      background: "#111827",
+      color: "#ffffff",
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+    },
     title: {
       margin: 0,
       fontSize: 28,
@@ -142,13 +151,13 @@ const [managedProjectWorkers, setManagedProjectWorkers] = useState([]);
       color: "#d1d5db",
     },
     card: {
-  background: "#ffffff",
-  border: "1px solid #d1d5db",
-  borderRadius: 12,
-  padding: 16,
-  marginTop: 12,
-  boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
-},
+      background: "#ffffff",
+      border: "1px solid #d1d5db",
+      borderRadius: 12,
+      padding: 16,
+      marginTop: 12,
+      boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
+    },
     button: {
       padding: "12px 18px",
       borderRadius: 8,
@@ -158,17 +167,17 @@ const [managedProjectWorkers, setManagedProjectWorkers] = useState([]);
       fontSize: 16,
     },
     primaryButton: {
-  padding: "14px 20px",
-  borderRadius: 8,
-  border: "none",
-  background: "#2563eb",
-  color: "#ffffff",
-  cursor: "pointer",
-  fontSize: 16,
-  fontWeight: "bold",
-  marginTop: 16,
-  width: "100%",
-},
+      padding: "14px 20px",
+      borderRadius: 8,
+      border: "none",
+      background: "#2563eb",
+      color: "#ffffff",
+      cursor: "pointer",
+      fontSize: 16,
+      fontWeight: "bold",
+      marginTop: 16,
+      width: "100%",
+    },
     saveButton: {
       padding: "10px 14px",
       borderRadius: 8,
@@ -221,21 +230,21 @@ const [managedProjectWorkers, setManagedProjectWorkers] = useState([]);
       fontSize: 15,
     },
     documentButton: {
-  display: "block",
-  padding: "14px 20px",
-  borderRadius: 8,
-  border: "none",
-  background: "#059669",
-  color: "#ffffff",
-  cursor: "pointer",
-  fontSize: 16,
-  fontWeight: "bold",
-  marginTop: 16,
-  textDecoration: "none",
-  textAlign: "center",
-  width: "100%",
-  boxSizing: "border-box",
-},
+      display: "block",
+      padding: "14px 20px",
+      borderRadius: 8,
+      border: "none",
+      background: "#059669",
+      color: "#ffffff",
+      cursor: "pointer",
+      fontSize: 16,
+      fontWeight: "bold",
+      marginTop: 16,
+      textDecoration: "none",
+      textAlign: "center",
+      width: "100%",
+      boxSizing: "border-box",
+    },
     input: {
       display: "block",
       marginBottom: 12,
@@ -1135,100 +1144,100 @@ const [managedProjectWorkers, setManagedProjectWorkers] = useState([]);
 
     alert("Worker updated.");
   }
-async function loadManagedProjectWorkers(projectId) {
-  if (!projectId) {
-    setManagedProjectWorkers([]);
-    return [];
+  async function loadManagedProjectWorkers(projectId) {
+    if (!projectId) {
+      setManagedProjectWorkers([]);
+      return [];
+    }
+
+    const { data: projectWorkerData, error: projectWorkerError } =
+      await supabase
+        .from("worker_projects")
+        .select("id, worker_id, project_id")
+        .eq("project_id", projectId);
+
+    if (projectWorkerError) {
+      console.log(projectWorkerError);
+      setManagedProjectWorkers([]);
+      return [];
+    }
+
+    const workerIds = (projectWorkerData || []).map((row) => row.worker_id);
+
+    if (workerIds.length === 0) {
+      setManagedProjectWorkers([]);
+      return [];
+    }
+
+    const { data: workerData, error: workerError } = await supabase
+      .from("workers")
+      .select("*")
+      .in("id", workerIds)
+      .order("full_name", { ascending: true });
+
+    if (workerError) {
+      console.log(workerError);
+      setManagedProjectWorkers([]);
+      return [];
+    }
+
+    const workersWithLinks = (workerData || []).map((workerItem) => {
+      const linkRow = (projectWorkerData || []).find(
+        (row) => row.worker_id === workerItem.id
+      );
+
+      return {
+        ...workerItem,
+        worker_project_link_id: linkRow?.id,
+      };
+    });
+
+    setManagedProjectWorkers(workersWithLinks);
+    return workersWithLinks;
   }
 
-  const { data: projectWorkerData, error: projectWorkerError } =
-    await supabase
-      .from("worker_projects")
-      .select("id, worker_id, project_id")
-      .eq("project_id", projectId);
+  async function removeWorkerFromProject(workerProjectLinkId) {
+    if (!isAdmin) {
+      alert("You do not have access to remove workers from projects.");
+      return;
+    }
 
-  if (projectWorkerError) {
-    console.log(projectWorkerError);
-    setManagedProjectWorkers([]);
-    return [];
-  }
+    if (!workerProjectLinkId) {
+      alert("Project worker link not found.");
+      return;
+    }
 
-  const workerIds = (projectWorkerData || []).map((row) => row.worker_id);
-
-  if (workerIds.length === 0) {
-    setManagedProjectWorkers([]);
-    return [];
-  }
-
-  const { data: workerData, error: workerError } = await supabase
-    .from("workers")
-    .select("*")
-    .in("id", workerIds)
-    .order("full_name", { ascending: true });
-
-  if (workerError) {
-    console.log(workerError);
-    setManagedProjectWorkers([]);
-    return [];
-  }
-
-  const workersWithLinks = (workerData || []).map((workerItem) => {
-    const linkRow = (projectWorkerData || []).find(
-      (row) => row.worker_id === workerItem.id
+    const confirmed = window.confirm(
+      "Remove this worker from the selected project?"
     );
 
-    return {
-      ...workerItem,
-      worker_project_link_id: linkRow?.id,
-    };
-  });
+    if (!confirmed) {
+      return;
+    }
 
-  setManagedProjectWorkers(workersWithLinks);
-  return workersWithLinks;
-}
+    const { error } = await supabase
+      .from("worker_projects")
+      .delete()
+      .eq("id", workerProjectLinkId);
 
-async function removeWorkerFromProject(workerProjectLinkId) {
-  if (!isAdmin) {
-    alert("You do not have access to remove workers from projects.");
-    return;
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadManagedProjectWorkers(manageProjectWorkersId);
+
+    if (manageProjectWorkersId === selectedProjectId) {
+      await loadProjectWorkers(selectedProjectId);
+    }
+
+    alert("Worker removed from project.");
   }
 
-  if (!workerProjectLinkId) {
-    alert("Project worker link not found.");
-    return;
+  function handleManageProjectWorkersChange(projectId) {
+    setManageProjectWorkersId(projectId);
+    loadManagedProjectWorkers(projectId);
   }
-
-  const confirmed = window.confirm(
-    "Remove this worker from the selected project?"
-  );
-
-  if (!confirmed) {
-    return;
-  }
-
-  const { error } = await supabase
-    .from("worker_projects")
-    .delete()
-    .eq("id", workerProjectLinkId);
-
-  if (error) {
-    alert(error.message);
-    return;
-  }
-
-  await loadManagedProjectWorkers(manageProjectWorkersId);
-
-  if (manageProjectWorkersId === selectedProjectId) {
-    await loadProjectWorkers(selectedProjectId);
-  }
-
-  alert("Worker removed from project.");
-}
-
-function handleManageProjectWorkersChange(projectId) {
-  setManageProjectWorkersId(projectId);
-  loadManagedProjectWorkers(projectId);
-}
   async function linkWorkerToProject() {
     if (!isAdmin) {
       alert("You do not have access to link workers to projects.");
@@ -1271,14 +1280,14 @@ function handleManageProjectWorkersChange(projectId) {
     setLinkProjectId("");
 
     if (linkProjectId === selectedProjectId) {
-  await loadLatestAssignmentForProject(selectedProjectId, worker);
-}
+      await loadLatestAssignmentForProject(selectedProjectId, worker);
+    }
 
-if (linkProjectId === manageProjectWorkersId) {
-  await loadManagedProjectWorkers(manageProjectWorkersId);
-}
+    if (linkProjectId === manageProjectWorkersId) {
+      await loadManagedProjectWorkers(manageProjectWorkersId);
+    }
 
-alert("Worker linked to project.");
+    alert("Worker linked to project.");
   }
 
   async function createSafetyTopic() {
@@ -2354,89 +2363,94 @@ alert("Worker linked to project.");
                     Link Worker
                   </button>
                 </div>
-<div style={styles.card}>
-  <h4 style={{ marginTop: 0 }}>Project Worker Assignments</h4>
+                <div style={styles.card}>
+                  <h4 style={{ marginTop: 0 }}>Project Worker Assignments</h4>
 
-  <p style={{ color: "#4b5563" }}>
-    Select a project to see which workers are assigned to it. You can remove a
-    worker from a project without deleting their worker profile.
-  </p>
+                  <p style={{ color: "#4b5563" }}>
+                    Select a project to see which workers are assigned to it. You can remove a
+                    worker from a project without deleting their worker profile.
+                  </p>
 
-  <label>
-    Project
-    <select
-      style={styles.select}
-      value={manageProjectWorkersId}
-      onChange={(event) =>
-        handleManageProjectWorkersChange(event.target.value)
-      }
-    >
-      <option value="">Select project</option>
-      {projects.map((projectItem) => (
-        <option key={projectItem.id} value={projectItem.id}>
-          {projectItem.project_name}
-        </option>
-      ))}
-    </select>
-  </label>
+                  <label>
+                    Project
+                    <select
+                      style={styles.select}
+                      value={manageProjectWorkersId}
+                      onChange={(event) =>
+                        handleManageProjectWorkersChange(event.target.value)
+                      }
+                    >
+                      <option value="">Select project</option>
+                      {projects.map((projectItem) => (
+                        <option key={projectItem.id} value={projectItem.id}>
+                          {projectItem.project_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-  {manageProjectWorkersId ? (
-    managedProjectWorkers.length > 0 ? (
-      <div style={styles.tableWrap}>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Worker</th>
-              <th style={styles.th}>Email</th>
-              <th style={styles.th}>Phone</th>
-              <th style={styles.th}>Role</th>
-              <th style={styles.th}>Action</th>
-            </tr>
-          </thead>
+                  {manageProjectWorkersId ? (
+                    managedProjectWorkers.length > 0 ? (
+                      <div style={styles.tableWrap}>
+                        <table style={styles.table}>
+                          <thead>
+                            <tr>
+                              <th style={styles.th}>Worker</th>
+                              <th style={styles.th}>Email</th>
+                              <th style={styles.th}>Phone</th>
+                              <th style={styles.th}>Role</th>
+                              <th style={styles.th}>Action</th>
+                            </tr>
+                          </thead>
 
-          <tbody>
-            {managedProjectWorkers.map((workerItem) => (
-              <tr key={workerItem.id}>
-                <td style={styles.td}>{workerItem.full_name}</td>
+                          <tbody>
+                            {managedProjectWorkers.map((workerItem) => (
+                              <tr key={workerItem.id}>
+                                <td style={styles.td}>{workerItem.full_name}</td>
 
-                <td style={styles.td}>{workerItem.email || "No email"}</td>
+                                <td style={styles.td}>{workerItem.email || "No email"}</td>
 
-                <td style={styles.td}>{workerItem.phone || "No phone"}</td>
+                                <td style={styles.td}>{workerItem.phone || "No phone"}</td>
 
-                <td style={styles.td}>{workerItem.role || "worker"}</td>
+                                <td style={styles.td}>{workerItem.role || "worker"}</td>
 
-                <td style={styles.td}>
-                  <button
-                    onClick={() =>
-                      removeWorkerFromProject(
-                        workerItem.worker_project_link_id
-                      )
-                    }
-                    style={{
-                      ...styles.saveButton,
-                      background: "#dc2626",
-                    }}
-                  >
-                    Remove
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    ) : (
-      <p style={styles.warning}>
-        No workers are assigned to this project yet.
-      </p>
-    )
-  ) : (
-    <p style={styles.warning}>Select a project to view assigned workers.</p>
-  )}
-</div>
+                                <td style={styles.td}>
+                                  <button
+                                    onClick={() =>
+                                      removeWorkerFromProject(
+                                        workerItem.worker_project_link_id
+                                      )
+                                    }
+                                    style={{
+                                      ...styles.saveButton,
+                                      background: "#dc2626",
+                                    }}
+                                  >
+                                    Remove
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p style={styles.warning}>
+                        No workers are assigned to this project yet.
+                      </p>
+                    )
+                  ) : (
+                    <p style={styles.warning}>Select a project to view assigned workers.</p>
+                  )}
+                </div>
                 <h4>Existing Workers</h4>
-
-                {allWorkers.length > 0 ? (
+                <input
+                  style={styles.input}
+                  placeholder="Search workers by name, email, phone, or role..."
+                  value={workerSearch}
+                  onChange={(event) => setWorkerSearch(event.target.value)}
+                />
+                {filteredWorkers.length > 0 ? (
                   <div style={styles.tableWrap}>
                     <table style={styles.table}>
                       <thead>
@@ -2451,7 +2465,7 @@ alert("Worker linked to project.");
                       </thead>
 
                       <tbody>
-                        {allWorkers.map((workerItem) => (
+                        {filteredWorkers.map((workerItem) => (
                           <tr key={workerItem.id}>
                             <td style={styles.td}>
                               <input
@@ -2538,7 +2552,7 @@ alert("Worker linked to project.");
                     </table>
                   </div>
                 ) : (
-                  <p style={styles.warning}>No workers found.</p>
+                  <p style={styles.warning}>No matching workers found.</p>
                 )}
               </div>
             )}
