@@ -41,7 +41,8 @@ export default function Home() {
 
   const [linkWorkerId, setLinkWorkerId] = useState("");
   const [linkProjectId, setLinkProjectId] = useState("");
-
+const [manageProjectWorkersId, setManageProjectWorkersId] = useState("");
+const [managedProjectWorkers, setManagedProjectWorkers] = useState([]);
   const [topicSearch, setTopicSearch] = useState("");
   const [selectedTopicId, setSelectedTopicId] = useState("");
   const [showAddTopicForm, setShowAddTopicForm] = useState(false);
@@ -1134,7 +1135,100 @@ export default function Home() {
 
     alert("Worker updated.");
   }
+async function loadManagedProjectWorkers(projectId) {
+  if (!projectId) {
+    setManagedProjectWorkers([]);
+    return [];
+  }
 
+  const { data: projectWorkerData, error: projectWorkerError } =
+    await supabase
+      .from("worker_projects")
+      .select("id, worker_id, project_id")
+      .eq("project_id", projectId);
+
+  if (projectWorkerError) {
+    console.log(projectWorkerError);
+    setManagedProjectWorkers([]);
+    return [];
+  }
+
+  const workerIds = (projectWorkerData || []).map((row) => row.worker_id);
+
+  if (workerIds.length === 0) {
+    setManagedProjectWorkers([]);
+    return [];
+  }
+
+  const { data: workerData, error: workerError } = await supabase
+    .from("workers")
+    .select("*")
+    .in("id", workerIds)
+    .order("full_name", { ascending: true });
+
+  if (workerError) {
+    console.log(workerError);
+    setManagedProjectWorkers([]);
+    return [];
+  }
+
+  const workersWithLinks = (workerData || []).map((workerItem) => {
+    const linkRow = (projectWorkerData || []).find(
+      (row) => row.worker_id === workerItem.id
+    );
+
+    return {
+      ...workerItem,
+      worker_project_link_id: linkRow?.id,
+    };
+  });
+
+  setManagedProjectWorkers(workersWithLinks);
+  return workersWithLinks;
+}
+
+async function removeWorkerFromProject(workerProjectLinkId) {
+  if (!isAdmin) {
+    alert("You do not have access to remove workers from projects.");
+    return;
+  }
+
+  if (!workerProjectLinkId) {
+    alert("Project worker link not found.");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    "Remove this worker from the selected project?"
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("worker_projects")
+    .delete()
+    .eq("id", workerProjectLinkId);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  await loadManagedProjectWorkers(manageProjectWorkersId);
+
+  if (manageProjectWorkersId === selectedProjectId) {
+    await loadProjectWorkers(selectedProjectId);
+  }
+
+  alert("Worker removed from project.");
+}
+
+function handleManageProjectWorkersChange(projectId) {
+  setManageProjectWorkersId(projectId);
+  loadManagedProjectWorkers(projectId);
+}
   async function linkWorkerToProject() {
     if (!isAdmin) {
       alert("You do not have access to link workers to projects.");
@@ -1177,10 +1271,14 @@ export default function Home() {
     setLinkProjectId("");
 
     if (linkProjectId === selectedProjectId) {
-      await loadLatestAssignmentForProject(selectedProjectId, worker);
-    }
+  await loadLatestAssignmentForProject(selectedProjectId, worker);
+}
 
-    alert("Worker linked to project.");
+if (linkProjectId === manageProjectWorkersId) {
+  await loadManagedProjectWorkers(manageProjectWorkersId);
+}
+
+alert("Worker linked to project.");
   }
 
   async function createSafetyTopic() {
@@ -2256,7 +2354,86 @@ export default function Home() {
                     Link Worker
                   </button>
                 </div>
+<div style={styles.card}>
+  <h4 style={{ marginTop: 0 }}>Project Worker Assignments</h4>
 
+  <p style={{ color: "#4b5563" }}>
+    Select a project to see which workers are assigned to it. You can remove a
+    worker from a project without deleting their worker profile.
+  </p>
+
+  <label>
+    Project
+    <select
+      style={styles.select}
+      value={manageProjectWorkersId}
+      onChange={(event) =>
+        handleManageProjectWorkersChange(event.target.value)
+      }
+    >
+      <option value="">Select project</option>
+      {projects.map((projectItem) => (
+        <option key={projectItem.id} value={projectItem.id}>
+          {projectItem.project_name}
+        </option>
+      ))}
+    </select>
+  </label>
+
+  {manageProjectWorkersId ? (
+    managedProjectWorkers.length > 0 ? (
+      <div style={styles.tableWrap}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.th}>Worker</th>
+              <th style={styles.th}>Email</th>
+              <th style={styles.th}>Phone</th>
+              <th style={styles.th}>Role</th>
+              <th style={styles.th}>Action</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {managedProjectWorkers.map((workerItem) => (
+              <tr key={workerItem.id}>
+                <td style={styles.td}>{workerItem.full_name}</td>
+
+                <td style={styles.td}>{workerItem.email || "No email"}</td>
+
+                <td style={styles.td}>{workerItem.phone || "No phone"}</td>
+
+                <td style={styles.td}>{workerItem.role || "worker"}</td>
+
+                <td style={styles.td}>
+                  <button
+                    onClick={() =>
+                      removeWorkerFromProject(
+                        workerItem.worker_project_link_id
+                      )
+                    }
+                    style={{
+                      ...styles.saveButton,
+                      background: "#dc2626",
+                    }}
+                  >
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ) : (
+      <p style={styles.warning}>
+        No workers are assigned to this project yet.
+      </p>
+    )
+  ) : (
+    <p style={styles.warning}>Select a project to view assigned workers.</p>
+  )}
+</div>
                 <h4>Existing Workers</h4>
 
                 {allWorkers.length > 0 ? (
