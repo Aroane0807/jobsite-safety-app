@@ -3241,6 +3241,83 @@ return (
               </div>
 
               <div style={styles.card}>
+                                <div style={styles.card}>
+                  <h4 style={{ marginTop: 0 }}>Weekly Assignment Planner</h4>
+
+                  <p style={{ color: "#4b5563" }}>
+                    Plan Monday through Friday safety topics for one project at
+                    once. Existing duplicate assignments will be skipped.
+                  </p>
+
+                  <label>
+                    Project
+                    <select
+                      style={styles.select}
+                      value={weeklyPlannerProjectId}
+                      onChange={(event) =>
+                        setWeeklyPlannerProjectId(event.target.value)
+                      }
+                    >
+                      <option value="">Select project</option>
+                      {projects.map((projectItem) => (
+                        <option key={projectItem.id} value={projectItem.id}>
+                          {projectItem.project_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Monday Date
+                    <input
+                      style={styles.input}
+                      type="date"
+                      value={weeklyPlannerStartDate}
+                      onChange={(event) =>
+                        setWeeklyPlannerStartDate(event.target.value)
+                      }
+                    />
+                  </label>
+
+                  {[
+                    { key: "monday", label: "Monday", offset: 0 },
+                    { key: "tuesday", label: "Tuesday", offset: 1 },
+                    { key: "wednesday", label: "Wednesday", offset: 2 },
+                    { key: "thursday", label: "Thursday", offset: 3 },
+                    { key: "friday", label: "Friday", offset: 4 },
+                  ].map((day) => (
+                    <label key={day.key}>
+                      {day.label}
+                      {weeklyPlannerStartDate
+                        ? ` - ${getWeeklyPlannerDate(day.offset)}`
+                        : ""}
+                      <select
+                        style={styles.select}
+                        value={weeklyPlannerTopics[day.key]}
+                        onChange={(event) =>
+                          updateWeeklyPlannerTopic(
+                            day.key,
+                            event.target.value
+                          )
+                        }
+                      >
+                        <option value="">No topic selected</option>
+                        {allTopics.map((topicItem) => (
+                          <option key={topicItem.id} value={topicItem.id}>
+                            {topicItem.title}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+
+                  <button
+                    onClick={createWeeklyAssignments}
+                    style={styles.primaryButton}
+                  >
+                    Create Weekly Assignments
+                  </button>
+                </div>
                 <h4 style={{ marginTop: 0 }}>Weekly Report</h4>
 
                 <p style={{ color: "#4b5563" }}>
