@@ -1017,42 +1017,66 @@ export default function Home() {
   }
 
   async function createWorker() {
-    if (!isAdmin) {
-      alert("You do not have access to create workers.");
-      return;
-    }
-
-    if (!newWorkerName.trim()) {
-      alert("Enter worker name.");
-      return;
-    }
-
-    if (!newWorkerEmail.trim()) {
-      alert("Enter worker email.");
-      return;
-    }
-
-    const { error } = await supabase.from("workers").insert({
-      full_name: newWorkerName.trim(),
-      email: newWorkerEmail.trim(),
-      phone: newWorkerPhone.trim() || null,
-      preferred_language: newWorkerLanguage,
-      role: newWorkerRole,
-    });
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setNewWorkerName("");
-    setNewWorkerEmail("");
-    setNewWorkerPhone("");
-    setNewWorkerLanguage("english");
-    setNewWorkerRole("worker");
-    await refreshAdminLists();
-    alert("Worker created.");
+  if (!isAdmin) {
+    alert("You do not have access to create workers.");
+    return;
   }
+
+  if (!newWorkerName.trim()) {
+    alert("Enter worker name.");
+    return;
+  }
+
+  if (!newWorkerEmail.trim()) {
+    alert("Enter worker email.");
+    return;
+  }
+
+  if (!newWorkerPhone.trim()) {
+    alert("Enter worker phone number. This will be used as their password.");
+    return;
+  }
+
+  const cleanedPhone = newWorkerPhone.replace(/\D/g, "");
+
+  if (!cleanedPhone) {
+    alert("Enter a valid phone number using digits.");
+    return;
+  }
+
+  const response = await fetch("/api/create-worker", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      fullName: newWorkerName,
+      email: newWorkerEmail,
+      phone: cleanedPhone,
+      preferredLanguage: newWorkerLanguage,
+      role: newWorkerRole,
+    }),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    alert(result.error || "Could not create worker.");
+    return;
+  }
+
+  setNewWorkerName("");
+  setNewWorkerEmail("");
+  setNewWorkerPhone("");
+  setNewWorkerLanguage("english");
+  setNewWorkerRole("worker");
+
+  await refreshAdminLists();
+
+  alert(
+    "Worker created. They can log in with their email and phone number as the password."
+  );
+}
 
   function updateWorkerField(workerId, fieldName, value) {
     setAllWorkers((currentWorkers) =>
