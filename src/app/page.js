@@ -57,11 +57,23 @@ export default function Home() {
   const [uploadingDocument, setUploadingDocument] = useState(false);
 
   const [assignmentProjectId, setAssignmentProjectId] = useState("");
-  const [assignmentTopicId, setAssignmentTopicId] = useState("");
-  const [assignmentDate, setAssignmentDate] = useState("");
-  const [weeklyReportProjectId, setWeeklyReportProjectId] = useState("");
-  const [weeklyReportStartDate, setWeeklyReportStartDate] = useState("");
-  const [weeklyReportEndDate, setWeeklyReportEndDate] = useState("");
+const [assignmentTopicId, setAssignmentTopicId] = useState("");
+const [assignmentDate, setAssignmentDate] = useState("");
+
+const [weeklyReportProjectId, setWeeklyReportProjectId] = useState("");
+const [weeklyReportStartDate, setWeeklyReportStartDate] = useState("");
+const [weeklyReportEndDate, setWeeklyReportEndDate] = useState("");
+
+const [weeklyPlannerProjectId, setWeeklyPlannerProjectId] = useState("");
+const [weeklyPlannerStartDate, setWeeklyPlannerStartDate] = useState("");
+const [weeklyPlannerTopics, setWeeklyPlannerTopics] = useState({
+  monday: "",
+  tuesday: "",
+  wednesday: "",
+  thursday: "",
+  friday: "",
+});
+
   const isAdmin =
     worker?.role === "admin" || worker?.role === "superintendent";
 
