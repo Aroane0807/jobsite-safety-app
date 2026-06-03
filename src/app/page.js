@@ -41,8 +41,8 @@ export default function Home() {
 
   const [linkWorkerId, setLinkWorkerId] = useState("");
   const [linkProjectId, setLinkProjectId] = useState("");
-const [manageProjectWorkersId, setManageProjectWorkersId] = useState("");
-const [managedProjectWorkers, setManagedProjectWorkers] = useState([]);
+  const [manageProjectWorkersId, setManageProjectWorkersId] = useState("");
+  const [managedProjectWorkers, setManagedProjectWorkers] = useState([]);
   const [topicSearch, setTopicSearch] = useState("");
   const [selectedTopicId, setSelectedTopicId] = useState("");
   const [showAddTopicForm, setShowAddTopicForm] = useState(false);
@@ -59,7 +59,9 @@ const [managedProjectWorkers, setManagedProjectWorkers] = useState([]);
   const [assignmentProjectId, setAssignmentProjectId] = useState("");
   const [assignmentTopicId, setAssignmentTopicId] = useState("");
   const [assignmentDate, setAssignmentDate] = useState("");
-
+  const [weeklyReportProjectId, setWeeklyReportProjectId] = useState("");
+  const [weeklyReportStartDate, setWeeklyReportStartDate] = useState("");
+  const [weeklyReportEndDate, setWeeklyReportEndDate] = useState("");
   const isAdmin =
     worker?.role === "admin" || worker?.role === "superintendent";
 
@@ -115,23 +117,23 @@ const [managedProjectWorkers, setManagedProjectWorkers] = useState([]);
 
   const styles = {
     page: {
-  minHeight: "100vh",
-  background: "#f4f6f8",
-  padding: "12px",
-  fontFamily: "Arial, sans-serif",
-  color: "#1f2937",
-},
+      minHeight: "100vh",
+      background: "#f4f6f8",
+      padding: "12px",
+      fontFamily: "Arial, sans-serif",
+      color: "#1f2937",
+    },
     container: {
       maxWidth: 1100,
       margin: "0 auto",
     },
     header: {
-  background: "#111827",
-  color: "#ffffff",
-  borderRadius: 12,
-  padding: 16,
-  marginBottom: 12,
-},
+      background: "#111827",
+      color: "#ffffff",
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+    },
     title: {
       margin: 0,
       fontSize: 28,
@@ -142,13 +144,13 @@ const [managedProjectWorkers, setManagedProjectWorkers] = useState([]);
       color: "#d1d5db",
     },
     card: {
-  background: "#ffffff",
-  border: "1px solid #d1d5db",
-  borderRadius: 12,
-  padding: 16,
-  marginTop: 12,
-  boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
-},
+      background: "#ffffff",
+      border: "1px solid #d1d5db",
+      borderRadius: 12,
+      padding: 16,
+      marginTop: 12,
+      boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
+    },
     button: {
       padding: "12px 18px",
       borderRadius: 8,
@@ -158,17 +160,17 @@ const [managedProjectWorkers, setManagedProjectWorkers] = useState([]);
       fontSize: 16,
     },
     primaryButton: {
-  padding: "14px 20px",
-  borderRadius: 8,
-  border: "none",
-  background: "#2563eb",
-  color: "#ffffff",
-  cursor: "pointer",
-  fontSize: 16,
-  fontWeight: "bold",
-  marginTop: 16,
-  width: "100%",
-},
+      padding: "14px 20px",
+      borderRadius: 8,
+      border: "none",
+      background: "#2563eb",
+      color: "#ffffff",
+      cursor: "pointer",
+      fontSize: 16,
+      fontWeight: "bold",
+      marginTop: 16,
+      width: "100%",
+    },
     saveButton: {
       padding: "10px 14px",
       borderRadius: 8,
@@ -221,21 +223,21 @@ const [managedProjectWorkers, setManagedProjectWorkers] = useState([]);
       fontSize: 15,
     },
     documentButton: {
-  display: "block",
-  padding: "14px 20px",
-  borderRadius: 8,
-  border: "none",
-  background: "#059669",
-  color: "#ffffff",
-  cursor: "pointer",
-  fontSize: 16,
-  fontWeight: "bold",
-  marginTop: 16,
-  textDecoration: "none",
-  textAlign: "center",
-  width: "100%",
-  boxSizing: "border-box",
-},
+      display: "block",
+      padding: "14px 20px",
+      borderRadius: 8,
+      border: "none",
+      background: "#059669",
+      color: "#ffffff",
+      cursor: "pointer",
+      fontSize: 16,
+      fontWeight: "bold",
+      marginTop: 16,
+      textDecoration: "none",
+      textAlign: "center",
+      width: "100%",
+      boxSizing: "border-box",
+    },
     input: {
       display: "block",
       marginBottom: 12,
@@ -1135,100 +1137,100 @@ const [managedProjectWorkers, setManagedProjectWorkers] = useState([]);
 
     alert("Worker updated.");
   }
-async function loadManagedProjectWorkers(projectId) {
-  if (!projectId) {
-    setManagedProjectWorkers([]);
-    return [];
+  async function loadManagedProjectWorkers(projectId) {
+    if (!projectId) {
+      setManagedProjectWorkers([]);
+      return [];
+    }
+
+    const { data: projectWorkerData, error: projectWorkerError } =
+      await supabase
+        .from("worker_projects")
+        .select("id, worker_id, project_id")
+        .eq("project_id", projectId);
+
+    if (projectWorkerError) {
+      console.log(projectWorkerError);
+      setManagedProjectWorkers([]);
+      return [];
+    }
+
+    const workerIds = (projectWorkerData || []).map((row) => row.worker_id);
+
+    if (workerIds.length === 0) {
+      setManagedProjectWorkers([]);
+      return [];
+    }
+
+    const { data: workerData, error: workerError } = await supabase
+      .from("workers")
+      .select("*")
+      .in("id", workerIds)
+      .order("full_name", { ascending: true });
+
+    if (workerError) {
+      console.log(workerError);
+      setManagedProjectWorkers([]);
+      return [];
+    }
+
+    const workersWithLinks = (workerData || []).map((workerItem) => {
+      const linkRow = (projectWorkerData || []).find(
+        (row) => row.worker_id === workerItem.id
+      );
+
+      return {
+        ...workerItem,
+        worker_project_link_id: linkRow?.id,
+      };
+    });
+
+    setManagedProjectWorkers(workersWithLinks);
+    return workersWithLinks;
   }
 
-  const { data: projectWorkerData, error: projectWorkerError } =
-    await supabase
-      .from("worker_projects")
-      .select("id, worker_id, project_id")
-      .eq("project_id", projectId);
+  async function removeWorkerFromProject(workerProjectLinkId) {
+    if (!isAdmin) {
+      alert("You do not have access to remove workers from projects.");
+      return;
+    }
 
-  if (projectWorkerError) {
-    console.log(projectWorkerError);
-    setManagedProjectWorkers([]);
-    return [];
-  }
+    if (!workerProjectLinkId) {
+      alert("Project worker link not found.");
+      return;
+    }
 
-  const workerIds = (projectWorkerData || []).map((row) => row.worker_id);
-
-  if (workerIds.length === 0) {
-    setManagedProjectWorkers([]);
-    return [];
-  }
-
-  const { data: workerData, error: workerError } = await supabase
-    .from("workers")
-    .select("*")
-    .in("id", workerIds)
-    .order("full_name", { ascending: true });
-
-  if (workerError) {
-    console.log(workerError);
-    setManagedProjectWorkers([]);
-    return [];
-  }
-
-  const workersWithLinks = (workerData || []).map((workerItem) => {
-    const linkRow = (projectWorkerData || []).find(
-      (row) => row.worker_id === workerItem.id
+    const confirmed = window.confirm(
+      "Remove this worker from the selected project?"
     );
 
-    return {
-      ...workerItem,
-      worker_project_link_id: linkRow?.id,
-    };
-  });
+    if (!confirmed) {
+      return;
+    }
 
-  setManagedProjectWorkers(workersWithLinks);
-  return workersWithLinks;
-}
+    const { error } = await supabase
+      .from("worker_projects")
+      .delete()
+      .eq("id", workerProjectLinkId);
 
-async function removeWorkerFromProject(workerProjectLinkId) {
-  if (!isAdmin) {
-    alert("You do not have access to remove workers from projects.");
-    return;
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadManagedProjectWorkers(manageProjectWorkersId);
+
+    if (manageProjectWorkersId === selectedProjectId) {
+      await loadProjectWorkers(selectedProjectId);
+    }
+
+    alert("Worker removed from project.");
   }
 
-  if (!workerProjectLinkId) {
-    alert("Project worker link not found.");
-    return;
+  function handleManageProjectWorkersChange(projectId) {
+    setManageProjectWorkersId(projectId);
+    loadManagedProjectWorkers(projectId);
   }
-
-  const confirmed = window.confirm(
-    "Remove this worker from the selected project?"
-  );
-
-  if (!confirmed) {
-    return;
-  }
-
-  const { error } = await supabase
-    .from("worker_projects")
-    .delete()
-    .eq("id", workerProjectLinkId);
-
-  if (error) {
-    alert(error.message);
-    return;
-  }
-
-  await loadManagedProjectWorkers(manageProjectWorkersId);
-
-  if (manageProjectWorkersId === selectedProjectId) {
-    await loadProjectWorkers(selectedProjectId);
-  }
-
-  alert("Worker removed from project.");
-}
-
-function handleManageProjectWorkersChange(projectId) {
-  setManageProjectWorkersId(projectId);
-  loadManagedProjectWorkers(projectId);
-}
   async function linkWorkerToProject() {
     if (!isAdmin) {
       alert("You do not have access to link workers to projects.");
@@ -1271,14 +1273,14 @@ function handleManageProjectWorkersChange(projectId) {
     setLinkProjectId("");
 
     if (linkProjectId === selectedProjectId) {
-  await loadLatestAssignmentForProject(selectedProjectId, worker);
-}
+      await loadLatestAssignmentForProject(selectedProjectId, worker);
+    }
 
-if (linkProjectId === manageProjectWorkersId) {
-  await loadManagedProjectWorkers(manageProjectWorkersId);
-}
+    if (linkProjectId === manageProjectWorkersId) {
+      await loadManagedProjectWorkers(manageProjectWorkersId);
+    }
 
-alert("Worker linked to project.");
+    alert("Worker linked to project.");
   }
 
   async function createSafetyTopic() {
@@ -1484,10 +1486,100 @@ alert("Worker linked to project.");
     setView(nextView);
   }
 
-  function generatePdfReport() {
-    if (!assignment || !topic || !project) {
-      alert("No report data found.");
+  async function generateWeeklyReport() {
+    if (!weeklyReportProjectId) {
+      alert("Choose a project for the weekly report.");
       return;
+    }
+
+    if (!weeklyReportStartDate) {
+      alert("Choose a start date for the weekly report.");
+      return;
+    }
+
+    if (!weeklyReportEndDate) {
+      alert("Choose an end date for the weekly report.");
+      return;
+    }
+
+    if (weeklyReportStartDate > weeklyReportEndDate) {
+      alert("Start date cannot be after end date.");
+      return;
+    }
+
+    const selectedProject = allProjects.find(
+      (projectItem) => projectItem.id === weeklyReportProjectId
+    );
+
+    const { data: assignmentData, error: assignmentError } = await supabase
+      .from("daily_assignments")
+      .select("id, assigned_date, project_id, topic_id")
+      .eq("project_id", weeklyReportProjectId)
+      .gte("assigned_date", weeklyReportStartDate)
+      .lte("assigned_date", weeklyReportEndDate)
+      .order("assigned_date", { ascending: true });
+
+    if (assignmentError) {
+      alert(assignmentError.message);
+      return;
+    }
+
+    if (!assignmentData || assignmentData.length === 0) {
+      alert("No assignments found for that project and date range.");
+      return;
+    }
+
+    const topicIds = [...new Set(assignmentData.map((item) => item.topic_id))];
+
+    const { data: topicData, error: topicError } = await supabase
+      .from("safety_topics")
+      .select("id, title, document_name, document_url")
+      .in("id", topicIds);
+
+    if (topicError) {
+      alert(topicError.message);
+      return;
+    }
+
+    const assignmentIds = assignmentData.map((item) => item.id);
+
+    const { data: ackData, error: ackError } = await supabase
+      .from("acknowledgements")
+      .select("*")
+      .in("assignment_id", assignmentIds);
+
+    if (ackError) {
+      alert(ackError.message);
+      return;
+    }
+
+    const { data: projectWorkerData, error: projectWorkerError } = await supabase
+      .from("worker_projects")
+      .select("worker_id")
+      .eq("project_id", weeklyReportProjectId);
+
+    if (projectWorkerError) {
+      alert(projectWorkerError.message);
+      return;
+    }
+
+    const workerIds = (projectWorkerData || []).map((row) => row.worker_id);
+
+    let projectWorkers = [];
+
+    if (workerIds.length > 0) {
+      const { data: workerData, error: workerError } = await supabase
+        .from("workers")
+        .select("*")
+        .in("id", workerIds)
+        .order("full_name", { ascending: true });
+
+      if (workerError) {
+        alert(workerError.message);
+        return;
+      }
+
+      projectWorkers = workerData || [];
     }
 
     const reportWindow = window.open("", "_blank");
@@ -1497,204 +1589,218 @@ alert("Worker linked to project.");
       return;
     }
 
-    const reportRows = workers
-      .map((workerItem) => {
-        const workerAck = getAcknowledgementForWorker(workerItem.id);
-        const isSigned = Boolean(workerAck);
+    const topicMap = new Map((topicData || []).map((item) => [item.id, item]));
+    const ackList = ackData || [];
+
+    const summaryRows = assignmentData
+      .map((assignmentItem) => {
+        const topicItem = topicMap.get(assignmentItem.topic_id);
+        const signedCountForAssignment = projectWorkers.filter((workerItem) =>
+          ackList.some(
+            (ack) =>
+              ack.assignment_id === assignmentItem.id &&
+              ack.worker_id === workerItem.id
+          )
+        ).length;
+
+        const pendingCountForAssignment =
+          projectWorkers.length - signedCountForAssignment;
+
+        const documentLink = topicItem?.document_url
+          ? `<a href="${escapeHtml(topicItem.document_url)}" target="_blank">${escapeHtml(
+            topicItem.document_name || "Open document"
+          )}</a>`
+          : "No document";
 
         return `
-          <tr>
-            <td>${escapeHtml(workerItem.full_name)}</td>
-            <td>${escapeHtml(workerItem.email || "No email")}</td>
-            <td class="${isSigned ? "signed" : "pending"}">
-              ${isSigned ? "Signed" : "Pending"}
-            </td>
-            <td>${escapeHtml(
-          formatDateTime(
-            workerAck?.acknowledged_at || workerAck?.Acknowledged_at
-          )
-        )}</td>
-          </tr>
-        `;
+        <tr>
+          <td>${escapeHtml(assignmentItem.assigned_date)}</td>
+          <td>${escapeHtml(topicItem?.title || "No topic")}</td>
+          <td>${documentLink}</td>
+          <td>${projectWorkers.length}</td>
+          <td class="signed">${signedCountForAssignment}</td>
+          <td class="pending">${pendingCountForAssignment}</td>
+        </tr>
+      `;
       })
       .join("");
 
-    const documentSection = topic.document_url
-      ? `
-        <p>
-          <strong>Document:</strong>
-          <a href="${escapeHtml(topic.document_url)}" target="_blank">
-            ${escapeHtml(topic.document_name || topic.document_url)}
-          </a>
-        </p>
-      `
-      : "";
+    const detailRows = assignmentData
+      .map((assignmentItem) => {
+        const topicItem = topicMap.get(assignmentItem.topic_id);
+
+        return projectWorkers
+          .map((workerItem) => {
+            const workerAck = ackList.find(
+              (ack) =>
+                ack.assignment_id === assignmentItem.id &&
+                ack.worker_id === workerItem.id
+            );
+
+            const isSigned = Boolean(workerAck);
+
+            return `
+            <tr>
+              <td>${escapeHtml(assignmentItem.assigned_date)}</td>
+              <td>${escapeHtml(topicItem?.title || "No topic")}</td>
+              <td>${escapeHtml(workerItem.full_name)}</td>
+              <td>${escapeHtml(workerItem.email || "No email")}</td>
+              <td class="${isSigned ? "signed" : "pending"}">
+                ${isSigned ? "Signed" : "Pending"}
+              </td>
+              <td>${escapeHtml(
+              formatDateTime(
+                workerAck?.acknowledged_at || workerAck?.Acknowledged_at
+              )
+            )}</td>
+            </tr>
+          `;
+          })
+          .join("");
+      })
+      .join("");
 
     const generatedAt = new Date().toLocaleString();
 
     reportWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Jobsite Safety Sign-Off Report</title>
-          <style>
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Weekly Jobsite Safety Report</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            color: #111827;
+            margin: 40px;
+          }
+
+          h1 {
+            margin-bottom: 5px;
+          }
+
+          h2 {
+            margin-top: 30px;
+            border-bottom: 2px solid #111827;
+            padding-bottom: 6px;
+          }
+
+          .muted {
+            color: #6b7280;
+            font-size: 14px;
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            margin-bottom: 25px;
+          }
+
+          th {
+            text-align: left;
+            border-bottom: 2px solid #111827;
+            padding: 10px;
+            background: #f3f4f6;
+          }
+
+          td {
+            border-bottom: 1px solid #d1d5db;
+            padding: 10px;
+            vertical-align: top;
+          }
+
+          .signed {
+            color: #166534;
+            font-weight: bold;
+          }
+
+          .pending {
+            color: #991b1b;
+            font-weight: bold;
+          }
+
+          .footer {
+            margin-top: 35px;
+            font-size: 12px;
+            color: #6b7280;
+          }
+
+          @media print {
+            button {
+              display: none;
+            }
+
             body {
-              font-family: Arial, sans-serif;
-              color: #111827;
-              margin: 40px;
+              margin: 24px;
             }
+          }
+        </style>
+      </head>
 
-            h1 {
-              margin-bottom: 5px;
-            }
+      <body>
+        <button onclick="window.print()" style="padding: 10px 16px; margin-bottom: 20px;">
+          Print / Save as PDF
+        </button>
 
-            h2 {
-              margin-top: 30px;
-              border-bottom: 2px solid #111827;
-              padding-bottom: 6px;
-            }
+        <h1>Weekly Jobsite Safety Report</h1>
+        <p class="muted">Generated: ${escapeHtml(generatedAt)}</p>
 
-            .muted {
-              color: #6b7280;
-              font-size: 14px;
-            }
-
-            .summary {
-              display: grid;
-              grid-template-columns: repeat(3, 1fr);
-              gap: 12px;
-              margin-top: 20px;
-              margin-bottom: 20px;
-            }
-
-            .summary-box {
-              border: 1px solid #d1d5db;
-              border-radius: 8px;
-              padding: 14px;
-              background: #f9fafb;
-            }
-
-            .summary-number {
-              font-size: 28px;
-              font-weight: bold;
-              margin: 0;
-            }
-
-            .summary-label {
-              margin: 4px 0 0 0;
-              color: #4b5563;
-            }
-
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 15px;
-            }
-
-            th {
-              text-align: left;
-              border-bottom: 2px solid #111827;
-              padding: 10px;
-              background: #f3f4f6;
-            }
-
-            td {
-              border-bottom: 1px solid #d1d5db;
-              padding: 10px;
-            }
-
-            .signed {
-              color: #166534;
-              font-weight: bold;
-            }
-
-            .pending {
-              color: #991b1b;
-              font-weight: bold;
-            }
-
-            .footer {
-              margin-top: 35px;
-              font-size: 12px;
-              color: #6b7280;
-            }
-
-            @media print {
-              button {
-                display: none;
-              }
-
-              body {
-                margin: 24px;
-              }
-            }
-          </style>
-        </head>
-
-        <body>
-          <button onclick="window.print()" style="padding: 10px 16px; margin-bottom: 20px;">
-            Print / Save as PDF
-          </button>
-
-          <h1>Jobsite Safety Sign-Off Report</h1>
-          <p class="muted">Generated: ${escapeHtml(generatedAt)}</p>
-
-          <h2>Assignment Details</h2>
-          <p><strong>Project:</strong> ${escapeHtml(project.project_name)}</p>
-          <p><strong>Safety Topic:</strong> ${escapeHtml(topic.title)}</p>
-          <p><strong>Assigned Date:</strong> ${escapeHtml(
-      assignment.assigned_date
+        <h2>Report Details</h2>
+        <p><strong>Project:</strong> ${escapeHtml(
+      selectedProject?.project_name || "Selected project"
     )}</p>
-          ${documentSection}
+        <p><strong>Date Range:</strong> ${escapeHtml(
+      weeklyReportStartDate
+    )} through ${escapeHtml(weeklyReportEndDate)}</p>
 
-          <h2>Summary</h2>
+        <h2>Weekly Assignment Summary</h2>
 
-          <div class="summary">
-            <div class="summary-box">
-              <p class="summary-number">${totalWorkerCount}</p>
-              <p class="summary-label">Project Workers</p>
-            </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Safety Topic</th>
+              <th>Document</th>
+              <th>Workers</th>
+              <th>Signed</th>
+              <th>Pending</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${summaryRows}
+          </tbody>
+        </table>
 
-            <div class="summary-box">
-              <p class="summary-number">${signedCount}</p>
-              <p class="summary-label">Signed</p>
-            </div>
+        <h2>Detailed Worker Sign-Off Status</h2>
 
-            <div class="summary-box">
-              <p class="summary-number">${pendingCount}</p>
-              <p class="summary-label">Pending</p>
-            </div>
-          </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Safety Topic</th>
+              <th>Worker</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th>Time Acknowledged</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${detailRows}
+          </tbody>
+        </table>
 
-          <h2>Worker Sign-Off Status</h2>
+        <p class="footer">
+          This weekly report was generated from the Jobsite Safety app.
+        </p>
 
-          <table>
-            <thead>
-              <tr>
-                <th>Worker</th>
-                <th>Email</th>
-                <th>Status</th>
-                <th>Time Acknowledged</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              ${reportRows}
-            </tbody>
-          </table>
-
-          <p class="footer">
-            This report was generated from the Jobsite Safety app.
-          </p>
-
-          <script>
-            setTimeout(() => {
-              window.print();
-            }, 500);
-          </script>
-        </body>
-      </html>
-    `);
+        <script>
+          setTimeout(() => {
+            window.print();
+          }, 500);
+        </script>
+      </body>
+    </html>
+  `);
 
     reportWindow.document.close();
   }
@@ -2354,86 +2460,86 @@ alert("Worker linked to project.");
                     Link Worker
                   </button>
                 </div>
-<div style={styles.card}>
-  <h4 style={{ marginTop: 0 }}>Project Worker Assignments</h4>
+                <div style={styles.card}>
+                  <h4 style={{ marginTop: 0 }}>Project Worker Assignments</h4>
 
-  <p style={{ color: "#4b5563" }}>
-    Select a project to see which workers are assigned to it. You can remove a
-    worker from a project without deleting their worker profile.
-  </p>
+                  <p style={{ color: "#4b5563" }}>
+                    Select a project to see which workers are assigned to it. You can remove a
+                    worker from a project without deleting their worker profile.
+                  </p>
 
-  <label>
-    Project
-    <select
-      style={styles.select}
-      value={manageProjectWorkersId}
-      onChange={(event) =>
-        handleManageProjectWorkersChange(event.target.value)
-      }
-    >
-      <option value="">Select project</option>
-      {projects.map((projectItem) => (
-        <option key={projectItem.id} value={projectItem.id}>
-          {projectItem.project_name}
-        </option>
-      ))}
-    </select>
-  </label>
+                  <label>
+                    Project
+                    <select
+                      style={styles.select}
+                      value={manageProjectWorkersId}
+                      onChange={(event) =>
+                        handleManageProjectWorkersChange(event.target.value)
+                      }
+                    >
+                      <option value="">Select project</option>
+                      {projects.map((projectItem) => (
+                        <option key={projectItem.id} value={projectItem.id}>
+                          {projectItem.project_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-  {manageProjectWorkersId ? (
-    managedProjectWorkers.length > 0 ? (
-      <div style={styles.tableWrap}>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Worker</th>
-              <th style={styles.th}>Email</th>
-              <th style={styles.th}>Phone</th>
-              <th style={styles.th}>Role</th>
-              <th style={styles.th}>Action</th>
-            </tr>
-          </thead>
+                  {manageProjectWorkersId ? (
+                    managedProjectWorkers.length > 0 ? (
+                      <div style={styles.tableWrap}>
+                        <table style={styles.table}>
+                          <thead>
+                            <tr>
+                              <th style={styles.th}>Worker</th>
+                              <th style={styles.th}>Email</th>
+                              <th style={styles.th}>Phone</th>
+                              <th style={styles.th}>Role</th>
+                              <th style={styles.th}>Action</th>
+                            </tr>
+                          </thead>
 
-          <tbody>
-            {managedProjectWorkers.map((workerItem) => (
-              <tr key={workerItem.id}>
-                <td style={styles.td}>{workerItem.full_name}</td>
+                          <tbody>
+                            {managedProjectWorkers.map((workerItem) => (
+                              <tr key={workerItem.id}>
+                                <td style={styles.td}>{workerItem.full_name}</td>
 
-                <td style={styles.td}>{workerItem.email || "No email"}</td>
+                                <td style={styles.td}>{workerItem.email || "No email"}</td>
 
-                <td style={styles.td}>{workerItem.phone || "No phone"}</td>
+                                <td style={styles.td}>{workerItem.phone || "No phone"}</td>
 
-                <td style={styles.td}>{workerItem.role || "worker"}</td>
+                                <td style={styles.td}>{workerItem.role || "worker"}</td>
 
-                <td style={styles.td}>
-                  <button
-                    onClick={() =>
-                      removeWorkerFromProject(
-                        workerItem.worker_project_link_id
-                      )
-                    }
-                    style={{
-                      ...styles.saveButton,
-                      background: "#dc2626",
-                    }}
-                  >
-                    Remove
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    ) : (
-      <p style={styles.warning}>
-        No workers are assigned to this project yet.
-      </p>
-    )
-  ) : (
-    <p style={styles.warning}>Select a project to view assigned workers.</p>
-  )}
-</div>
+                                <td style={styles.td}>
+                                  <button
+                                    onClick={() =>
+                                      removeWorkerFromProject(
+                                        workerItem.worker_project_link_id
+                                      )
+                                    }
+                                    style={{
+                                      ...styles.saveButton,
+                                      background: "#dc2626",
+                                    }}
+                                  >
+                                    Remove
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p style={styles.warning}>
+                        No workers are assigned to this project yet.
+                      </p>
+                    )
+                  ) : (
+                    <p style={styles.warning}>Select a project to view assigned workers.</p>
+                  )}
+                </div>
                 <h4>Existing Workers</h4>
 
                 {allWorkers.length > 0 ? (
@@ -2906,6 +3012,53 @@ alert("Worker linked to project.");
                   ) : (
                     <p style={styles.warning}>No assignments found.</p>
                   )}
+                </div><div style={styles.card}>
+                  <h4 style={{ marginTop: 0 }}>Weekly Report</h4>
+
+                  <p style={{ color: "#4b5563" }}>
+                    Generate one report for all safety assignments on a project during a date
+                    range.
+                  </p>
+
+                  <label>
+                    Project
+                    <select
+                      style={styles.select}
+                      value={weeklyReportProjectId}
+                      onChange={(event) => setWeeklyReportProjectId(event.target.value)}
+                    >
+                      <option value="">Select project</option>
+                      {allProjects.map((projectItem) => (
+                        <option key={projectItem.id} value={projectItem.id}>
+                          {projectItem.project_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Start Date
+                    <input
+                      style={styles.input}
+                      type="date"
+                      value={weeklyReportStartDate}
+                      onChange={(event) => setWeeklyReportStartDate(event.target.value)}
+                    />
+                  </label>
+
+                  <label>
+                    End Date
+                    <input
+                      style={styles.input}
+                      type="date"
+                      value={weeklyReportEndDate}
+                      onChange={(event) => setWeeklyReportEndDate(event.target.value)}
+                    />
+                  </label>
+
+                  <button onClick={generateWeeklyReport} style={styles.reportButton}>
+                    Generate Weekly Report
+                  </button>
                 </div>
               </div>
             )}
