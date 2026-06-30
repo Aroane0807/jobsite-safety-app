@@ -128,6 +128,23 @@ export async function createAssignment(projectId, topicId, date) {
   return error;
 }
 
+export async function deleteAssignment(assignmentId) {
+  // Delete acknowledgements first, then the assignment
+  const { error: ackError } = await supabase
+    .from("acknowledgements")
+    .delete()
+    .eq("assignment_id", assignmentId);
+
+  if (ackError) return ackError;
+
+  const { error } = await supabase
+    .from("daily_assignments")
+    .delete()
+    .eq("id", assignmentId);
+
+  return error;
+}
+
 export async function fetchWeeklyReportData(projectId, startDate, endDate) {
   const { data: assignmentData, error: assignmentError } = await supabase
     .from("daily_assignments")

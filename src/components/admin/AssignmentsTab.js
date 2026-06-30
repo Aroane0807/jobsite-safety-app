@@ -29,6 +29,7 @@ export default function AssignmentsTab({
   onWeeklyReportEndDateChange,
   onGenerateWeeklyReport,
   onViewDashboard,
+  onDeleteAssignment,
   getWeeklyPlannerDate,
 }) {
   return (
@@ -103,9 +104,17 @@ export default function AssignmentsTab({
                     <td style={styles.td}>{item.project_name || "No project"}</td>
                     <td style={styles.td}>{item.topic_title || "No topic"}</td>
                     <td style={styles.td}>
-                      <button onClick={() => onViewDashboard(item)} style={styles.saveButton}>
-                        View Dashboard
-                      </button>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button onClick={() => onViewDashboard(item)} style={styles.saveButton}>
+                          View Dashboard
+                        </button>
+                        <button
+                          onClick={() => onDeleteAssignment(item)}
+                          style={{ ...styles.saveButton, background: "#dc2626" }}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

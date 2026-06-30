@@ -45,6 +45,7 @@ import {
   checkDuplicateAssignment,
   createAssignment,
   fetchWeeklyReportData,
+  deleteAssignment,
 } from "../lib/assignments";
 
 import { generateDailyPdf, generateWeeklyPdf } from "../lib/reports";
@@ -522,6 +523,23 @@ export default function Home() {
     setView("dashboard");
   }
 
+  async function handleDeleteAssignment(assignmentItem) {
+    if (!isAdmin) { alert("You do not have access to delete assignments."); return; }
+    if (!window.confirm(`Delete the assignment for "${assignmentItem.topic_title}" on ${assignmentItem.assigned_date}? This will also remove all acknowledgements for it.`)) return;
+
+    const error = await deleteAssignment(assignmentItem.id);
+    if (error) { alert(error.message); return; }
+
+    setAllAssignments(await fetchAllAssignments());
+
+    // If the deleted assignment was the currently displayed one, clear it
+    if (assignment?.id === assignmentItem.id) {
+      await loadLatestAssignmentForProject(selectedProjectId, worker);
+    }
+
+    alert("Assignment deleted.");
+  }
+
   function handleProjectChange(e) {
     const newId = e.target.value;
     setSelectedProjectId(newId);
@@ -768,6 +786,7 @@ export default function Home() {
             onWeeklyReportEndDateChange={setWeeklyReportEndDate}
             onGenerateWeeklyReport={handleGenerateWeeklyReport}
             onViewDashboard={viewAssignmentDashboard}
+            onDeleteAssignment={handleDeleteAssignment}
             getWeeklyPlannerDate={getWeeklyPlannerDate}
           />
         )}
