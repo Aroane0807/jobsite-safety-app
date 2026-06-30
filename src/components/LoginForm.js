@@ -2,7 +2,7 @@
 
 import { styles } from "../styles/shared";
 
-export default function LoginForm({ email, password, onEmailChange, onPasswordChange, onLogin }) {
+export default function LoginForm({ email, password, rememberMe, onEmailChange, onPasswordChange, onRememberMeChange, onLogin }) {
   return (
     <main style={styles.page}>
       <div style={{ ...styles.container, maxWidth: 420 }}>
@@ -28,6 +28,16 @@ export default function LoginForm({ email, password, onEmailChange, onPasswordCh
             value={password}
             onChange={(e) => onPasswordChange(e.target.value)}
           />
+
+          <label style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => onRememberMeChange(e.target.checked)}
+              style={{ width: 18, height: 18, cursor: "pointer" }}
+            />
+            <span style={{ fontSize: 15, color: "#374151" }}>Keep me logged in on this device</span>
+          </label>
 
           <button onClick={onLogin} style={styles.primaryButton}>
             Login

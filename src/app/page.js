@@ -69,6 +69,7 @@ export default function Home() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
 
   const [checked, setChecked] = useState(false);
   const [message, setMessage] = useState("");
@@ -132,8 +133,16 @@ export default function Home() {
 
   async function login() {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) alert(error.message);
-    else setUser(data.user);
+    if (error) { alert(error.message); return; }
+
+    if (!rememberMe) {
+      // Sign out automatically when the browser tab is closed
+      window.addEventListener("beforeunload", () => {
+        supabase.auth.signOut();
+      });
+    }
+
+    setUser(data.user);
   }
 
   async function logout() {
@@ -599,8 +608,10 @@ export default function Home() {
       <LoginForm
         email={email}
         password={password}
+        rememberMe={rememberMe}
         onEmailChange={setEmail}
         onPasswordChange={setPassword}
+        onRememberMeChange={setRememberMe}
         onLogin={login}
       />
     );
