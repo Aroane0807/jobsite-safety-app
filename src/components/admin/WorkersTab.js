@@ -16,6 +16,7 @@ export default function WorkersTab({
   onInviteWorker,
   onUpdateWorkerField,
   onSaveWorker,
+  onDeleteWorker,
   onLinkWorkerIdChange,
   onLinkProjectIdChange,
   onLinkWorker,
@@ -220,9 +221,17 @@ export default function WorkersTab({
                     </select>
                   </td>
                   <td style={styles.td}>
-                    <button onClick={() => onSaveWorker(workerItem)} style={styles.saveButton}>
-                      Save
-                    </button>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => onSaveWorker(workerItem)} style={styles.saveButton}>
+                        Save
+                      </button>
+                      <button
+                        onClick={() => onDeleteWorker(workerItem)}
+                        style={{ ...styles.saveButton, background: "#dc2626" }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

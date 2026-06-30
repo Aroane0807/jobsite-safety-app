@@ -345,6 +345,27 @@ export default function Home() {
     alert("Worker updated.");
   }
 
+  async function handleDeleteWorker(workerItem) {
+    if (!isAdmin) { alert("You do not have access to delete workers."); return; }
+    if (!window.confirm(`Delete ${workerItem.full_name}? This will remove their login, project assignments, and all acknowledgement history.`)) return;
+
+    const response = await fetch("/api/delete-worker", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+      },
+      body: JSON.stringify({ workerId: workerItem.id }),
+    });
+
+    const result = await response.json();
+    if (!response.ok) { alert(result.error || "Could not delete worker."); return; }
+
+    setAllWorkers(await fetchAllWorkers());
+    if (selectedProjectId) await loadProjectWorkers(selectedProjectId);
+    alert(`${workerItem.full_name} has been deleted.`);
+  }
+
   async function handleLinkWorker() {
     if (!isAdmin) { alert("You do not have access to link workers to projects."); return; }
     if (!linkWorkerId) { alert("Choose a worker."); return; }
@@ -721,6 +742,7 @@ export default function Home() {
             onInviteWorker={handleInviteWorker}
             onUpdateWorkerField={updateWorkerField}
             onSaveWorker={handleSaveWorker}
+            onDeleteWorker={handleDeleteWorker}
             linkWorkerId={linkWorkerId}
             linkProjectId={linkProjectId}
             onLinkWorkerIdChange={setLinkWorkerId}
