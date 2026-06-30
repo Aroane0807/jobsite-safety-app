@@ -7,19 +7,13 @@ export default function WorkersTab({
   projects,
   managedProjectWorkers,
   manageProjectWorkersId,
-  newWorkerName,
-  newWorkerEmail,
-  newWorkerPhone,
-  newWorkerLanguage,
-  newWorkerRole,
+  inviteEmail,
+  inviteRole,
   linkWorkerId,
   linkProjectId,
-  onNewWorkerNameChange,
-  onNewWorkerEmailChange,
-  onNewWorkerPhoneChange,
-  onNewWorkerLanguageChange,
-  onNewWorkerRoleChange,
-  onCreateWorker,
+  onInviteEmailChange,
+  onInviteRoleChange,
+  onInviteWorker,
   onUpdateWorkerField,
   onSaveWorker,
   onLinkWorkerIdChange,
@@ -31,63 +25,33 @@ export default function WorkersTab({
   return (
     <div style={styles.card}>
       <h3>Manage Workers</h3>
-      <p>Add workers, edit worker details, and link workers to projects.</p>
+      <p>Invite workers by email, edit worker details, and link workers to projects.</p>
 
       <div style={styles.card}>
-        <h4 style={{ marginTop: 0 }}>Add New Worker</h4>
+        <h4 style={{ marginTop: 0 }}>Invite New Worker</h4>
         <p style={{ marginTop: 0, color: "#4b5563" }}>
-          Worker login password will be their phone number using digits only.
+          Enter the worker's email address and we'll send them a link to create their own account.
+          They'll fill in their name, phone number, and set their own password.
         </p>
 
         <div style={styles.inlineGrid}>
           <label>
-            Full Name
+            Email Address
             <input
               style={styles.input}
-              placeholder="Full name"
-              value={newWorkerName}
-              onChange={(e) => onNewWorkerNameChange(e.target.value)}
+              placeholder="worker@email.com"
+              type="email"
+              value={inviteEmail}
+              onChange={(e) => onInviteEmailChange(e.target.value)}
             />
-          </label>
-
-          <label>
-            Email
-            <input
-              style={styles.input}
-              placeholder="Email"
-              value={newWorkerEmail}
-              onChange={(e) => onNewWorkerEmailChange(e.target.value)}
-            />
-          </label>
-
-          <label>
-            Phone
-            <input
-              style={styles.input}
-              placeholder="Phone"
-              value={newWorkerPhone}
-              onChange={(e) => onNewWorkerPhoneChange(e.target.value)}
-            />
-          </label>
-
-          <label>
-            Language
-            <select
-              style={styles.select}
-              value={newWorkerLanguage}
-              onChange={(e) => onNewWorkerLanguageChange(e.target.value)}
-            >
-              <option value="english">English</option>
-              <option value="spanish">Spanish</option>
-            </select>
           </label>
 
           <label>
             Role
             <select
               style={styles.select}
-              value={newWorkerRole}
-              onChange={(e) => onNewWorkerRoleChange(e.target.value)}
+              value={inviteRole}
+              onChange={(e) => onInviteRoleChange(e.target.value)}
             >
               <option value="worker">Worker</option>
               <option value="superintendent">Superintendent</option>
@@ -96,8 +60,8 @@ export default function WorkersTab({
           </label>
         </div>
 
-        <button onClick={onCreateWorker} style={styles.primaryButton}>
-          Create Worker
+        <button onClick={onInviteWorker} style={styles.primaryButton}>
+          Send Invite
         </button>
       </div>
 

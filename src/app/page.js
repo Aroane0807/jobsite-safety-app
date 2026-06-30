@@ -80,11 +80,8 @@ export default function Home() {
 
   const [newProjectName, setNewProjectName] = useState("");
 
-  const [newWorkerName, setNewWorkerName] = useState("");
-  const [newWorkerEmail, setNewWorkerEmail] = useState("");
-  const [newWorkerPhone, setNewWorkerPhone] = useState("");
-  const [newWorkerLanguage, setNewWorkerLanguage] = useState("english");
-  const [newWorkerRole, setNewWorkerRole] = useState("worker");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("worker");
 
   const [linkWorkerId, setLinkWorkerId] = useState("");
   const [linkProjectId, setLinkProjectId] = useState("");
@@ -308,40 +305,25 @@ export default function Home() {
     alert("Project updated.");
   }
 
-  async function handleCreateWorker() {
-    if (!isAdmin) { alert("You do not have access to create workers."); return; }
-    if (!newWorkerName.trim()) { alert("Enter worker name."); return; }
-    if (!newWorkerEmail.trim()) { alert("Enter worker email."); return; }
-    if (!newWorkerPhone.trim()) { alert("Enter worker phone number. This will be used as their password."); return; }
+  async function handleInviteWorker() {
+    if (!isAdmin) { alert("You do not have access to invite workers."); return; }
+    if (!inviteEmail.trim()) { alert("Enter the worker's email address."); return; }
 
-    const cleanedPhone = newWorkerPhone.replace(/\D/g, "");
-    if (!cleanedPhone) { alert("Enter a valid phone number using digits."); return; }
-
-    const response = await fetch("/api/create-worker", {
+    const response = await fetch("/api/invite-worker", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
       },
-      body: JSON.stringify({
-        fullName: newWorkerName,
-        email: newWorkerEmail,
-        phone: cleanedPhone,
-        preferredLanguage: newWorkerLanguage,
-        role: newWorkerRole,
-      }),
+      body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
     });
 
     const result = await response.json();
-    if (!response.ok) { alert(result.error || "Could not create worker."); return; }
+    if (!response.ok) { alert(result.error || "Could not send invite."); return; }
 
-    setNewWorkerName(""); setNewWorkerEmail(""); setNewWorkerPhone("");
-    setNewWorkerLanguage("english"); setNewWorkerRole("worker");
-
-    const updated = await fetchActiveProjects();
-    setProjects(updated);
-    await refreshAdminLists(updated);
-    alert("Worker created. They can log in with their email and phone number as the password.");
+    setInviteEmail("");
+    setInviteRole("worker");
+    alert(`Invite sent to ${inviteEmail}. They will receive an email with a link to set up their account.`);
   }
 
   function updateWorkerField(workerId, fieldName, value) {
@@ -732,17 +714,11 @@ export default function Home() {
             onCreateProject={handleCreateProject}
             onUpdateProjectField={updateProjectField}
             onSaveProject={handleSaveProject}
-            newWorkerName={newWorkerName}
-            newWorkerEmail={newWorkerEmail}
-            newWorkerPhone={newWorkerPhone}
-            newWorkerLanguage={newWorkerLanguage}
-            newWorkerRole={newWorkerRole}
-            onNewWorkerNameChange={setNewWorkerName}
-            onNewWorkerEmailChange={setNewWorkerEmail}
-            onNewWorkerPhoneChange={setNewWorkerPhone}
-            onNewWorkerLanguageChange={setNewWorkerLanguage}
-            onNewWorkerRoleChange={setNewWorkerRole}
-            onCreateWorker={handleCreateWorker}
+            inviteEmail={inviteEmail}
+            inviteRole={inviteRole}
+            onInviteEmailChange={setInviteEmail}
+            onInviteRoleChange={setInviteRole}
+            onInviteWorker={handleInviteWorker}
             onUpdateWorkerField={updateWorkerField}
             onSaveWorker={handleSaveWorker}
             linkWorkerId={linkWorkerId}
